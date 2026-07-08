@@ -60,6 +60,7 @@ jobs:
   build:
     needs: prepare
     if: needs.prepare.outputs.build_needed == 'true'
+    name: Build ${{ matrix.artifact }}
     runs-on: macos-15
     timeout-minutes: 60
     strategy:
@@ -67,21 +68,21 @@ jobs:
       matrix:
         include:
           - target: aarch64-macos
-            variant: macosx
+            artifact: ghostty-vt-macosx-arm64
           - target: x86_64-macos
-            variant: macosx
+            artifact: ghostty-vt-macosx-x86_64
           - target: aarch64-ios
-            variant: iphoneos
+            artifact: ghostty-vt-iphoneos-arm64
           - target: aarch64-ios-simulator
-            variant: iphonesimulator
+            artifact: ghostty-vt-iphonesimulator-arm64
             cpu: apple_a17
           - target: x86_64-ios-simulator
-            variant: iphonesimulator
+            artifact: ghostty-vt-iphonesimulator-x86_64
           - target: aarch64-ios-macabi
-            variant: maccatalyst
+            artifact: ghostty-vt-maccatalyst-arm64
             cpu: apple_a17
           - target: x86_64-ios-macabi
-            variant: maccatalyst
+            artifact: ghostty-vt-maccatalyst-x86_64
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -102,12 +103,12 @@ jobs:
             "$PWD/build/out"
 
       - name: Upload Target
-        run: tar -czf "target--${{ matrix.variant }}--${{ matrix.target }}.tar.gz" -C build/out .
+        run: tar -czf "${{ matrix.artifact }}.tar.gz" -C build/out .
 
       - uses: actions/upload-artifact@v7.0.1
         with:
-          name: target--${{ matrix.variant }}--${{ matrix.target }}
-          path: target--${{ matrix.variant }}--${{ matrix.target }}.tar.gz
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.tar.gz
           compression-level: 0
           retention-days: 1
 
@@ -123,7 +124,7 @@ jobs:
 
       - uses: actions/download-artifact@v8.0.1
         with:
-          pattern: target-*
+          pattern: ghostty-vt-*
           path: build/tarballs
           merge-multiple: true
 
@@ -143,7 +144,7 @@ jobs:
       - uses: actions/upload-artifact@v7.0.1
         if: needs.prepare.outputs.do_release != 'true'
         with:
-          name: GhosttyVtPrebuilt-xcframework
+          name: GhosttyVtPrebuilt.xcframework.zip
           path: build/GhosttyVtPrebuilt.xcframework.zip
           compression-level: 0
           retention-days: 7
