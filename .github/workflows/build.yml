@@ -49,7 +49,7 @@ jobs:
 
       - name: Prepare Build
         id: prepare
-        run: ./scripts/ci/prepare.sh "$EVENT_NAME" "$GHOSTTY_REF" "$RELEASE_TAG" "$SKIP_RELEASE"
+        run: ./Scripts/ci/prepare.sh "$EVENT_NAME" "$GHOSTTY_REF" "$RELEASE_TAG" "$SKIP_RELEASE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
@@ -96,7 +96,7 @@ jobs:
 
       - name: Build
         run: |
-          ZIG_CPU="${{ matrix.cpu }}" ./scripts/build-target.sh \
+          ZIG_CPU="${{ matrix.cpu }}" ./Scripts/build-target.sh \
             "$PWD/references/ghostty-upstream" \
             "${{ matrix.target }}" \
             "$PWD/build/out"
@@ -129,8 +129,8 @@ jobs:
 
       - name: Create XCFramework
         run: |
-          ./scripts/ci/assemble-artifacts.sh build/tarballs build/dest
-          ./scripts/create-xcframework.sh \
+          ./Scripts/ci/assemble-artifacts.sh build/tarballs build/dest
+          ./Scripts/create-xcframework.sh \
             "$PWD/build/dest" \
             "$PWD/binary/GhosttyVtPrebuilt.xcframework" \
             "$PWD/build/GhosttyVtPrebuilt.xcframework.zip"
@@ -154,7 +154,7 @@ jobs:
       - name: Update Package Manifest
         if: needs.prepare.outputs.do_release == 'true'
         run: |
-          ./scripts/update-package.sh \
+          ./Scripts/update-package.sh \
             "$PWD/build/GhosttyVtPrebuilt.xcframework.zip" \
             "https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare.outputs.storage_release_tag }}/GhosttyVtPrebuilt.xcframework.zip"
 
