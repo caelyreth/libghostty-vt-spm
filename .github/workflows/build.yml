@@ -40,7 +40,6 @@ jobs:
       build_ref: ${{ steps.prepare.outputs.build_ref }}
       resolved_sha: ${{ steps.prepare.outputs.resolved_sha }}
       release_tag: ${{ steps.prepare.outputs.release_tag }}
-      storage_release_tag: ${{ steps.prepare.outputs.storage_release_tag }}
       do_release: ${{ steps.prepare.outputs.do_release }}
     steps:
       - uses: actions/checkout@v7.0.0
@@ -113,6 +112,7 @@ jobs:
           retention-days: 1
 
   package:
+    name: Prepare XCFramework
     needs: [prepare, build]
     if: needs.prepare.outputs.build_needed == 'true'
     runs-on: macos-15
@@ -154,7 +154,7 @@ jobs:
         run: |
           ./Scripts/update-package.sh \
             "$PWD/build/GhosttyVtPrebuilt.xcframework.zip" \
-            "https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare.outputs.storage_release_tag }}/GhosttyVtPrebuilt.xcframework.zip"
+            "https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare.outputs.release_tag }}/GhosttyVtPrebuilt.xcframework.zip"
 
       - name: Commit Package Manifest
         if: needs.prepare.outputs.do_release == 'true'
@@ -165,25 +165,25 @@ jobs:
           git commit -m "chore: publish libghostty-vt ${{ needs.prepare.outputs.release_tag }}" || echo "No changes to commit"
           git push
 
-      - name: Publish Storage Release
-        if: needs.prepare.outputs.do_release == 'true'
-        uses: softprops/action-gh-release@v3.0.1
-        with:
-          tag_name: ${{ needs.prepare.outputs.storage_release_tag }}
-          body: |
-            libghostty-vt XCFramework
-
-            Built from ghostty ref: ${{ needs.prepare.outputs.build_ref }}
-            Built from ghostty sha: ${{ needs.prepare.outputs.resolved_sha }}
-          files: build/GhosttyVtPrebuilt.xcframework.zip
-
-      - name: Publish Package Release
+      - name: Publish Release
         if: needs.prepare.outputs.do_release == 'true'
         uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ needs.prepare.outputs.release_tag }}
           body: |
-            GhosttyVt ${{ needs.prepare.outputs.release_tag }}
+            ### GhosttyVt ${{ needs.prepare.outputs.release_tag }}
 
-            Built from ghostty ref: ${{ needs.prepare.outputs.build_ref }}
-            Built from ghostty sha: ${{ needs.prepare.outputs.resolved_sha }}
+            SwiftPM binary package for `libghostty-vt`.
+
+            ### Upstream
+
+            - Ref: [`${{ needs.prepare.outputs.build_ref }}`](https://github.com/ghostty-org/ghostty/tree/${{ needs.prepare.outputs.build_ref }})
+            - Commit: [`${{ needs.prepare.outputs.resolved_sha }}`](https://github.com/ghostty-org/ghostty/commit/${{ needs.prepare.outputs.resolved_sha }})
+
+            ### Assets
+
+            - `GhosttyVtPrebuilt.xcframework.zip`: SwiftPM binary target artifact.
+            - `ghostty-vt-*.tar.gz`: per-SDK static library archives.
+          files: |
+            build/GhosttyVtPrebuilt.xcframework.zip
+            build/tarballs/ghostty-vt-*.tar.gz

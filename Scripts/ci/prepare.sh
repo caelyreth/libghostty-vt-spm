@@ -28,8 +28,7 @@ write_outputs() {
         echo "build_ref=$2"
         echo "resolved_sha=$3"
         echo "release_tag=$4"
-        echo "storage_release_tag=$5"
-        echo "do_release=$6"
+        echo "do_release=$5"
     } >> "$OUTPUT_FILE"
 }
 
@@ -46,7 +45,7 @@ else
 fi
 
 if [ -z "$BUILD_REF" ]; then
-    write_outputs false "" "" "" "" false
+    write_outputs false "" "" "" false
     exit 0
 fi
 
@@ -62,8 +61,6 @@ else
     RELEASE_TAG=$(next_release_tag)
 fi
 
-STORAGE_RELEASE_TAG="storage.$RELEASE_TAG"
-
 if [ "$SKIP_RELEASE" = "true" ]; then
     DO_RELEASE=false
 else
@@ -73,10 +70,10 @@ fi
 BUILD_NEEDED=true
 if [ "$DO_RELEASE" = "true" ]; then
     git fetch --tags origin
-    if git rev-parse "$STORAGE_RELEASE_TAG" >/dev/null 2>&1; then
-        echo "[*] release $STORAGE_RELEASE_TAG already exists, skipping"
+    if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+        echo "[*] release $RELEASE_TAG already exists, skipping"
         BUILD_NEEDED=false
     fi
 fi
 
-write_outputs "$BUILD_NEEDED" "$BUILD_REF" "$RESOLVED_SHA" "$RELEASE_TAG" "$STORAGE_RELEASE_TAG" "$DO_RELEASE"
+write_outputs "$BUILD_NEEDED" "$BUILD_REF" "$RESOLVED_SHA" "$RELEASE_TAG" "$DO_RELEASE"

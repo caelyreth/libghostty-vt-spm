@@ -19,7 +19,7 @@ let package = Package(
         ),
         .binaryTarget(
             name: "GhosttyVtPrebuilt",
-            url: "https://github.com/caelyreth/libghostty-vt-spm/releases/download/storage.0.0.0/GhosttyVtPrebuilt.xcframework.zip",
+            url: "https://github.com/caelyreth/libghostty-vt-spm/releases/download/0.0.0/GhosttyVtPrebuilt.xcframework.zip",
             checksum: "0000000000000000000000000000000000000000000000000000000000000000"
         ),
     ]
