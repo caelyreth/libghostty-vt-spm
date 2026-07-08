@@ -7,8 +7,6 @@ let package = Package(
         .iOS(.v17),
         .macOS(.v14),
         .macCatalyst(.v17),
-        .tvOS(.v17),
-        .visionOS(.v1),
     ],
     products: [
         .library(name: "GhosttyVt", targets: ["GhosttyVt"]),
@@ -21,8 +19,7 @@ let package = Package(
         ),
         .binaryTarget(
             name: "GhosttyVtPrebuilt",
-            url: "__DOWNLOAD_URL__",
-            checksum: "__CHECKSUM__"
+            path: "binary/GhosttyVtPrebuilt.xcframework"
         ),
     ]
 )

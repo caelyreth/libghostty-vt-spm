@@ -14,7 +14,7 @@ The package exposes the C API from Ghostty's `include/ghostty/vt.h`.
 
 ### Platforms
 
-Minimal supported: macOS 14, iOS 17, macCatalyst 17, tvOS 17, and visionOS 1
+Minimal supported: macOS 14, iOS 17, and macCatalyst 17.
 
 ### Thanks
 

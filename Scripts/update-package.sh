@@ -21,6 +21,6 @@ CHECKSUM=$(swift package compute-checksum "$XCFRAMEWORK_ZIP")
 sed \
     -e "s|__DOWNLOAD_URL__|$DOWNLOAD_URL|g" \
     -e "s|__CHECKSUM__|$CHECKSUM|g" \
-    Package.swift.template > Package.swift
+    Scripts/templates/Package.swift.template > Package.swift
 
 echo "[*] package checksum: $CHECKSUM"
