@@ -7,14 +7,7 @@ INPUT_REF=${2:-}
 INPUT_RELEASE_TAG=${3:-}
 SKIP_RELEASE=${4:-false}
 OUTPUT_FILE=${GITHUB_OUTPUT:-/dev/stdout}
-GHOSTTY_REPO=${GHOSTTY_REPO:-https://github.com/ghostty-org/ghostty.git}
-
-latest_ghostty_ref() {
-    git ls-remote --tags --refs --sort='version:refname' "$GHOSTTY_REPO" 'v*' |
-        sed 's|.*refs/tags/||' |
-        grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' |
-        tail -n 1
-}
+DEFAULT_GHOSTTY_REF=${DEFAULT_GHOSTTY_REF:-main}
 
 next_release_tag() {
     latest=$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort='version:refname' | tail -n 1)
@@ -49,7 +42,7 @@ fi
 if [ -n "$INPUT_REF" ]; then
     BUILD_REF=$INPUT_REF
 else
-    BUILD_REF=$(latest_ghostty_ref)
+    BUILD_REF=$DEFAULT_GHOSTTY_REF
 fi
 
 if [ -z "$BUILD_REF" ]; then

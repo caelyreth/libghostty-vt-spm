@@ -54,11 +54,13 @@ if [ -n "$OUTPUT_ZIP" ]; then
         exit 1
     fi
 
+    TEMP_ZIP="$(dirname "$OUTPUT_XCFRAMEWORK")/$(basename "$OUTPUT_ZIP")"
     rm -f "$OUTPUT_ZIP"
+    [ "$TEMP_ZIP" = "$OUTPUT_ZIP" ] || rm -f "$TEMP_ZIP"
     mkdir -p "$(dirname "$OUTPUT_ZIP")"
     (
         cd "$(dirname "$OUTPUT_XCFRAMEWORK")"
         ditto -c -k --sequesterRsrc --keepParent "$(basename "$OUTPUT_XCFRAMEWORK")" "$(basename "$OUTPUT_ZIP")"
     )
-    mv "$(dirname "$OUTPUT_XCFRAMEWORK")/$(basename "$OUTPUT_ZIP")" "$OUTPUT_ZIP"
+    [ "$TEMP_ZIP" = "$OUTPUT_ZIP" ] || mv "$TEMP_ZIP" "$OUTPUT_ZIP"
 fi
