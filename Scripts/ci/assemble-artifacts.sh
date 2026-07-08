@@ -22,8 +22,14 @@ for tarball in "$TARBALLS_DIR"/target--*.tar.gz; do
     FOUND_TARBALLS=$((FOUND_TARBALLS + 1))
 
     name=$(basename "$tarball" .tar.gz)
-    variant=$(echo "$name" | awk -F'--' '{print $2}')
-    target=$(echo "$name" | awk -F'--' '{print $3}')
+    name=${name#target--}
+    variant=${name%%--*}
+    target=${name#*--}
+
+    if [ -z "$variant" ] || [ -z "$target" ] || [ "$variant" = "$target" ]; then
+        echo "[!] malformed target artifact name: $tarball"
+        exit 1
+    fi
 
     mkdir -p "$TARGETS_DIR/$variant/$target"
     tar -xzf "$tarball" -C "$TARGETS_DIR/$variant/$target"
