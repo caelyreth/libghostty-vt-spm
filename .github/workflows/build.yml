@@ -43,13 +43,13 @@ jobs:
       storage_release_tag: ${{ steps.prepare.outputs.storage_release_tag }}
       do_release: ${{ steps.prepare.outputs.do_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0
 
       - name: Prepare Build
         id: prepare
-        run: ./Scripts/ci/prepare.sh "$EVENT_NAME" "$GHOSTTY_REF" "$RELEASE_TAG" "$SKIP_RELEASE"
+        run: ./scripts/ci/prepare.sh "$EVENT_NAME" "$GHOSTTY_REF" "$RELEASE_TAG" "$SKIP_RELEASE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
@@ -83,9 +83,9 @@ jobs:
           - target: x86_64-ios-macabi
             variant: maccatalyst
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.0
 
-      - uses: mlugg/setup-zig@v2
+      - uses: mlugg/setup-zig@v2.2.1
         with:
           version: 0.15.2
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Build
         run: |
-          ZIG_CPU="${{ matrix.cpu }}" ./Scripts/build-target.sh \
+          ZIG_CPU="${{ matrix.cpu }}" ./scripts/build-target.sh \
             "$PWD/references/ghostty-upstream" \
             "${{ matrix.target }}" \
             "$PWD/build/out"
@@ -104,7 +104,7 @@ jobs:
       - name: Upload Target
         run: tar -czf "target--${{ matrix.variant }}--${{ matrix.target }}.tar.gz" -C build/out .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: target--${{ matrix.variant }}--${{ matrix.target }}
           path: target--${{ matrix.variant }}--${{ matrix.target }}.tar.gz
@@ -117,11 +117,11 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8.0.1
         with:
           pattern: target-*
           path: build/tarballs
@@ -129,8 +129,8 @@ jobs:
 
       - name: Create XCFramework
         run: |
-          ./Scripts/ci/assemble-artifacts.sh build/tarballs build/dest
-          ./Scripts/create-xcframework.sh \
+          ./scripts/ci/assemble-artifacts.sh build/tarballs build/dest
+          ./scripts/create-xcframework.sh \
             "$PWD/build/dest" \
             "$PWD/binary/GhosttyVtPrebuilt.xcframework" \
             "$PWD/build/GhosttyVtPrebuilt.xcframework.zip"
@@ -143,7 +143,7 @@ jobs:
             -Xcc "-I$PWD/build/dest/macosx/include" \
             -Xlinker "-L$PWD/build/dest/macosx/lib"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.1
         if: needs.prepare.outputs.do_release != 'true'
         with:
           name: GhosttyVtPrebuilt-xcframework
@@ -154,7 +154,7 @@ jobs:
       - name: Update Package Manifest
         if: needs.prepare.outputs.do_release == 'true'
         run: |
-          ./Scripts/update-package.sh \
+          ./scripts/update-package.sh \
             "$PWD/build/GhosttyVtPrebuilt.xcframework.zip" \
             "https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare.outputs.storage_release_tag }}/GhosttyVtPrebuilt.xcframework.zip"
 
@@ -169,7 +169,7 @@ jobs:
 
       - name: Publish Storage Release
         if: needs.prepare.outputs.do_release == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ needs.prepare.outputs.storage_release_tag }}
           body: |
@@ -181,7 +181,7 @@ jobs:
 
       - name: Publish Package Release
         if: needs.prepare.outputs.do_release == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ needs.prepare.outputs.release_tag }}
           body: |

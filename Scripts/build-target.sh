@@ -66,7 +66,7 @@ if [ -z "$LIBRARY_PATH" ] || [ ! -f "$LIBRARY_PATH" ]; then
 fi
 
 cp -R "$SOURCE_DIR/include/ghostty" "$OUTPUT_DIR/include/"
-cp "Scripts/templates/GhosttyVtPrebuilt.modulemap" "$OUTPUT_DIR/include/module.modulemap"
+cp "scripts/templates/GhosttyVtPrebuilt.modulemap" "$OUTPUT_DIR/include/module.modulemap"
 
 cp "$LIBRARY_PATH" "$OUTPUT_DIR/lib/libghostty-vt.a"
 
