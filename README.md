@@ -1,6 +1,6 @@
-### GhosttyVtSPM
+### Ghostty VT Swift Package
 
-Minimal Swift Package wrapper for upstream `libghostty-vt`.
+Minimal Swift Package wrapper for upstream [`libghostty-vt`](https://github.com/ghostty-org/ghostty).
 
 ### Usage
 
@@ -16,6 +16,13 @@ The package exposes the C API from Ghostty's `include/ghostty/vt.h`.
 
 Minimal supported: macOS 14, iOS 17, and macCatalyst 17.
 
-### Thanks
+### Acknowledgements
 
-Thanks to [Lakr233/libghostty-spm](https://github.com/Lakr233/libghostty-spm) for the original Ghostty SwiftPM packaging reference.
+- [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) for `libghostty-vt`
+- [Lakr233/libghostty-spm](https://github.com/Lakr233/libghostty-spm) for packaging reference
+
+### License
+
+Copyright © 2026 Yu
+
+Open sourced under the [MIT](/LICENSE) license
