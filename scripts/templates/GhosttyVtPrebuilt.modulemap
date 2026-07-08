@@ -1,0 +1,5 @@
+module GhosttyVtPrebuilt {
+    umbrella header "ghostty/vt.h"
+    link "c++"
+    export *
+}

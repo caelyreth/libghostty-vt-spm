@@ -1,0 +1,10 @@
+# spm
+.build/
+.swiftpm/
+build/
+binary/
+references/
+*.xcframework.zip
+
+# os
+.DS_Store

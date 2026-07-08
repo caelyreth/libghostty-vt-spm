@@ -1,0 +1,191 @@
+name: Build libghostty-vt
+
+on:
+  workflow_dispatch:
+    inputs:
+      ghostty_ref:
+        description: "Ghostty tag or commit. Empty means latest semver tag."
+        required: false
+        type: string
+        default: ""
+      release_tag:
+        description: "Package release version, for example 1.2.0. Empty means next patch."
+        required: false
+        type: string
+        default: ""
+      skip_release:
+        description: "Build and test without publishing releases."
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref_name || 'scheduled' }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  prepare:
+    runs-on: macos-15
+    outputs:
+      build_needed: ${{ steps.prepare.outputs.build_needed }}
+      build_ref: ${{ steps.prepare.outputs.build_ref }}
+      resolved_sha: ${{ steps.prepare.outputs.resolved_sha }}
+      release_tag: ${{ steps.prepare.outputs.release_tag }}
+      storage_release_tag: ${{ steps.prepare.outputs.storage_release_tag }}
+      do_release: ${{ steps.prepare.outputs.do_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare Build
+        id: prepare
+        run: ./scripts/ci/prepare.sh "$EVENT_NAME" "$GHOSTTY_REF" "$RELEASE_TAG" "$SKIP_RELEASE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          GHOSTTY_REF: ${{ github.event.inputs.ghostty_ref }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          SKIP_RELEASE: ${{ github.event.inputs.skip_release || 'false' }}
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.build_needed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-macos
+            variant: macosx
+          - target: x86_64-macos
+            variant: macosx
+          - target: aarch64-ios
+            variant: iphoneos
+          - target: aarch64-ios-simulator
+            variant: iphonesimulator
+            cpu: apple_a17
+          - target: x86_64-ios-simulator
+            variant: iphonesimulator
+          - target: aarch64-ios-macabi
+            variant: maccatalyst
+            cpu: apple_a17
+          - target: x86_64-ios-macabi
+            variant: maccatalyst
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Checkout Ghostty
+        run: |
+          git clone https://github.com/ghostty-org/ghostty references/ghostty-upstream
+          git -C references/ghostty-upstream checkout "${{ needs.prepare.outputs.build_ref }}"
+
+      - name: Build
+        run: |
+          ZIG_CPU="${{ matrix.cpu }}" ./scripts/build-target.sh \
+            "$PWD/references/ghostty-upstream" \
+            "${{ matrix.target }}" \
+            "$PWD/build/out"
+
+      - name: Upload Target
+        run: tar -czf "target--${{ matrix.variant }}--${{ matrix.target }}.tar.gz" -C build/out .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: target--${{ matrix.variant }}--${{ matrix.target }}
+          path: target--${{ matrix.variant }}--${{ matrix.target }}.tar.gz
+          compression-level: 0
+          retention-days: 1
+
+  package:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.build_needed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: target-*
+          path: build/tarballs
+          merge-multiple: true
+
+      - name: Create XCFramework
+        run: |
+          ./scripts/ci/assemble-artifacts.sh build/tarballs build/dest
+          ./scripts/create-xcframework.sh \
+            "$PWD/build/dest" \
+            "$PWD/binary/GhosttyVtPrebuilt.xcframework" \
+            "$PWD/build/GhosttyVtPrebuilt.xcframework.zip"
+
+      - name: Test Products
+        run: |
+          cp Package.local.swift Package.swift
+          swift build --product GhosttyVt
+          GHOSTTY_VT_DISABLE_BINARY=1 swift build --product GhosttyVt \
+            -Xcc "-I$PWD/build/dest/macosx/include" \
+            -Xlinker "-L$PWD/build/dest/macosx/lib"
+
+      - uses: actions/upload-artifact@v4
+        if: needs.prepare.outputs.do_release != 'true'
+        with:
+          name: GhosttyVtPrebuilt-xcframework
+          path: build/GhosttyVtPrebuilt.xcframework.zip
+          compression-level: 0
+          retention-days: 7
+
+      - name: Update Package Manifest
+        if: needs.prepare.outputs.do_release == 'true'
+        run: |
+          ./scripts/update-package.sh \
+            "$PWD/build/GhosttyVtPrebuilt.xcframework.zip" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare.outputs.storage_release_tag }}/GhosttyVtPrebuilt.xcframework.zip"
+
+      - name: Commit Package Manifest
+        if: needs.prepare.outputs.do_release == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift
+          git commit -m "chore: publish libghostty-vt ${{ needs.prepare.outputs.release_tag }}" || echo "No changes to commit"
+          git push
+
+      - name: Publish Storage Release
+        if: needs.prepare.outputs.do_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.storage_release_tag }}
+          body: |
+            libghostty-vt XCFramework
+
+            Built from ghostty ref: ${{ needs.prepare.outputs.build_ref }}
+            Built from ghostty sha: ${{ needs.prepare.outputs.resolved_sha }}
+          files: build/GhosttyVtPrebuilt.xcframework.zip
+
+      - name: Publish Package Release
+        if: needs.prepare.outputs.do_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          body: |
+            GhosttyVt ${{ needs.prepare.outputs.release_tag }}
+
+            Built from ghostty ref: ${{ needs.prepare.outputs.build_ref }}
+            Built from ghostty sha: ${{ needs.prepare.outputs.resolved_sha }}
