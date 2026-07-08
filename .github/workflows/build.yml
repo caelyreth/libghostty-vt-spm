@@ -139,9 +139,6 @@ jobs:
         run: |
           cp Package.local.swift Package.swift
           swift build --product GhosttyVt
-          GHOSTTY_VT_DISABLE_BINARY=1 swift build --product GhosttyVt \
-            -Xcc "-I$PWD/build/dest/macosx/include" \
-            -Xlinker "-L$PWD/build/dest/macosx/lib"
 
       - uses: actions/upload-artifact@v7.0.1
         if: needs.prepare.outputs.do_release != 'true'
