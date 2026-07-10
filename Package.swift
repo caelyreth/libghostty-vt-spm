@@ -3,7 +3,7 @@ import PackageDescription
 
 // Bump this before manually publishing a new package release.
 let releaseVersion = "0.2.1"
-let binaryArtifactVersion = "0.2.0"
+let binaryArtifactVersion = "0.2.1"
 
 let package = Package(
     name: "GhosttyVtSPM",
@@ -35,7 +35,7 @@ let package = Package(
         .binaryTarget(
             name: "GhosttyVtPrebuilt",
             url: "https://github.com/caelyreth/libghostty-vt-spm/releases/download/\(binaryArtifactVersion)/GhosttyVtPrebuilt.xcframework.zip",
-            checksum: "7d12fd0141507b355bc9a8ce9c1c6d2e9a1cb9a778bebd672c10d27641f4aba9"
+            checksum: "ea8f578e1f63e2a7b1cbc89eba71ad305affe2d41131cfc6132ed0a3f04129a2"
         ),
     ]
 )
