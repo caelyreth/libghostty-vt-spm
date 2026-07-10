@@ -151,6 +151,31 @@ final class TerminalTests: XCTestCase {
         }
     }
 
+    func testSelectionUsesViewportCellsAndFormatsClipboardText() throws {
+        let terminal = try Terminal(configuration: .init(columns: 16, rows: 3, maxScrollback: 0))
+        terminal.feed("alpha beta\r\nsecond line")
+
+        try terminal.select(
+            from: .init(column: 0, row: 0),
+            to: .init(column: 4, row: 0)
+        )
+        XCTAssertEqual(try terminal.copySelection(), "alpha")
+
+        try terminal.selectWord(at: .init(column: 7, row: 0))
+        XCTAssertEqual(try terminal.copySelection(), "beta")
+
+        try terminal.selectLine(at: .init(column: 2, row: 1))
+        XCTAssertEqual(try terminal.copySelection(), "second line")
+
+        try terminal.selectAll()
+        XCTAssertEqual(try terminal.copySelection(), "alpha beta\nsecond line")
+
+        try terminal.clearSelection()
+        XCTAssertThrowsError(try terminal.copySelection()) { error in
+            XCTAssertEqual(error as? TerminalError, .noValue)
+        }
+    }
+
     func testTerminalIsSendableAndSynchronizesConcurrentAccess() throws {
         assertSendable(Terminal.self)
 
