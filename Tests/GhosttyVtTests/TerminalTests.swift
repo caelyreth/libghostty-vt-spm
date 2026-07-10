@@ -70,6 +70,32 @@ final class TerminalTests: XCTestCase {
         XCTAssertEqual(frame.rows.count, 3)
     }
 
+    func testEncodesTerminalInput() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+
+        XCTAssertEqual(try terminal.encode(.init(text: "a")), Data("a".utf8))
+        XCTAssertEqual(try terminal.encode(.init(key: .enter)), Data([0x0D]))
+        XCTAssertTrue(Terminal.isPasteSafe("safe"))
+        XCTAssertFalse(Terminal.isPasteSafe("first\\nsecond"))
+        XCTAssertEqual(try terminal.encodePaste("first\\nsecond"), Data("first\\rsecond".utf8))
+    }
+
+    func testMouseEncodingUsesTerminalReportingMode() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        terminal.feed("\u{1B}[?1000h\u{1B}[?1006h")
+
+        let output = try terminal.encode(
+            .init(
+                action: .press,
+                button: .left,
+                position: .init(x: 12, y: 12)
+            ),
+            geometry: .init(screenWidth: 80, screenHeight: 32, cellWidth: 8, cellHeight: 16)
+        )
+
+        XCTAssertEqual(output, Data("\u{1B}[<0;2;1M".utf8))
+    }
+
     func testTerminalIsSendableAndSynchronizesConcurrentAccess() throws {
         assertSendable(Terminal.self)
 

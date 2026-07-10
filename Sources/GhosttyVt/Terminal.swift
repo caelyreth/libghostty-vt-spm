@@ -37,8 +37,14 @@ public final class Terminal: @unchecked Sendable {
     let renderState: OpaquePointer
     var rowIterator: OpaquePointer?
     var rowCells: OpaquePointer?
+    let keyEncoder: OpaquePointer
+    let keyEvent: OpaquePointer
+    let mouseEncoder: OpaquePointer
+    let mouseEvent: OpaquePointer
     var cachedTheme: TerminalFrame.Theme?
     var graphemeBuffer: [UInt8] = []
+    var inputBuffer = [UInt8](repeating: 0, count: 128)
+    var pressedMouseButtons: UInt16 = 0
 
     public init(configuration: Configuration = .init()) throws {
         guard configuration.columns > 0, configuration.rows > 0 else {
@@ -62,11 +68,27 @@ public final class Terminal: @unchecked Sendable {
         var rawRenderState: OpaquePointer?
         var rawRowIterator: OpaquePointer?
         var rawRowCells: OpaquePointer?
+        var rawKeyEncoder: OpaquePointer?
+        var rawKeyEvent: OpaquePointer?
+        var rawMouseEncoder: OpaquePointer?
+        var rawMouseEvent: OpaquePointer?
         do {
             try Self.check(ghostty_render_state_new(nil, &rawRenderState))
             try Self.check(ghostty_render_state_row_iterator_new(nil, &rawRowIterator))
             try Self.check(ghostty_render_state_row_cells_new(nil, &rawRowCells))
-            guard let rawRenderState, let rawRowIterator, let rawRowCells else {
+            try Self.check(ghostty_key_encoder_new(nil, &rawKeyEncoder))
+            try Self.check(ghostty_key_event_new(nil, &rawKeyEvent))
+            try Self.check(ghostty_mouse_encoder_new(nil, &rawMouseEncoder))
+            try Self.check(ghostty_mouse_event_new(nil, &rawMouseEvent))
+            guard
+                let rawRenderState,
+                let rawRowIterator,
+                let rawRowCells,
+                let rawKeyEncoder,
+                let rawKeyEvent,
+                let rawMouseEncoder,
+                let rawMouseEvent
+            else {
                 throw TerminalError.unexpectedResult
             }
 
@@ -74,7 +96,15 @@ public final class Terminal: @unchecked Sendable {
             renderState = rawRenderState
             rowIterator = rawRowIterator
             rowCells = rawRowCells
+            keyEncoder = rawKeyEncoder
+            keyEvent = rawKeyEvent
+            mouseEncoder = rawMouseEncoder
+            mouseEvent = rawMouseEvent
         } catch {
+            ghostty_mouse_event_free(rawMouseEvent)
+            ghostty_mouse_encoder_free(rawMouseEncoder)
+            ghostty_key_event_free(rawKeyEvent)
+            ghostty_key_encoder_free(rawKeyEncoder)
             ghostty_render_state_row_cells_free(rawRowCells)
             ghostty_render_state_row_iterator_free(rawRowIterator)
             ghostty_render_state_free(rawRenderState)
@@ -84,6 +114,10 @@ public final class Terminal: @unchecked Sendable {
     }
 
     deinit {
+        ghostty_mouse_event_free(mouseEvent)
+        ghostty_mouse_encoder_free(mouseEncoder)
+        ghostty_key_event_free(keyEvent)
+        ghostty_key_encoder_free(keyEncoder)
         ghostty_render_state_row_cells_free(rowCells)
         ghostty_render_state_row_iterator_free(rowIterator)
         ghostty_render_state_free(renderState)
@@ -149,5 +183,8 @@ public enum TerminalError: Error, Sendable, Equatable {
     case outOfMemory
     case outOfSpace
     case noValue
+    case invalidKey
+    case invalidMouseButton
+    case invalidMouseGeometry
     case unexpectedResult
 }
