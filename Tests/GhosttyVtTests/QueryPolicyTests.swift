@@ -23,6 +23,32 @@ final class QueryPolicyTests: XCTestCase {
         )
     }
 
+    func testQueryPolicyOwnsEnquiryAndXtermVersionResponses() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        try terminal.setQueryPolicy(.init(
+            enquiryResponse: Data("answerback".utf8),
+            xtermVersion: "RainBook 1.0"
+        ))
+
+        terminal.feed("\u{05}\u{1B}[>q")
+
+        XCTAssertEqual(
+            terminal.drainEvents(),
+            [
+                .writeToPty(Data("answerback".utf8)),
+                .writeToPty(Data("\u{1B}P>|RainBook 1.0\u{1B}\\".utf8)),
+            ]
+        )
+    }
+
+    func testFocusReportingStatusFollowsTerminalMode() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        XCTAssertFalse(try terminal.isFocusReportingEnabled())
+
+        terminal.feed("\u{1B}[?1004h")
+        XCTAssertTrue(try terminal.isFocusReportingEnabled())
+    }
+
     func testQueryPolicyRejectsInvalidValues() throws {
         let terminal = try Terminal(configuration: .init(columns: 4, rows: 2, maxScrollback: 0))
 
@@ -43,6 +69,11 @@ final class QueryPolicyTests: XCTestCase {
             )))
         ) { error in
             XCTAssertEqual(error as? TerminalError, .invalidDeviceAttributes)
+        }
+        XCTAssertThrowsError(
+            try terminal.setQueryPolicy(.init(xtermVersion: String(repeating: "a", count: 257)))
+        ) { error in
+            XCTAssertEqual(error as? TerminalError, .invalidXtermVersion)
         }
     }
 }

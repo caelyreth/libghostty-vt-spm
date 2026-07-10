@@ -60,6 +60,16 @@ extension Terminal {
             option: GHOSTTY_TERMINAL_OPT_DEVICE_ATTRIBUTES,
             callback: Self.deviceAttributesCallback
         )
+        try Self.setEffect(
+            on: handle,
+            option: GHOSTTY_TERMINAL_OPT_ENQUIRY,
+            callback: Self.enquiryCallback
+        )
+        try Self.setEffect(
+            on: handle,
+            option: GHOSTTY_TERMINAL_OPT_XTVERSION,
+            callback: Self.xtermVersionCallback
+        )
     }
 
     private static let writePtyCallback: @convention(c) (
@@ -143,6 +153,20 @@ extension Terminal {
         }
         output.pointee = deviceAttributes(from: attributes)
         return true
+    }
+
+    private static let enquiryCallback: @convention(c) (
+        OpaquePointer?,
+        UnsafeMutableRawPointer?
+    ) -> GhosttyString = { _, userdata in
+        terminal(from: userdata)?.enquiryResponseStorage.string ?? .init()
+    }
+
+    private static let xtermVersionCallback: @convention(c) (
+        OpaquePointer?,
+        UnsafeMutableRawPointer?
+    ) -> GhosttyString = { _, userdata in
+        terminal(from: userdata)?.xtermVersionStorage.string ?? .init()
     }
 
     private static func setEffect<Callback>(

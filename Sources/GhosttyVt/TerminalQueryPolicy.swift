@@ -1,3 +1,6 @@
+import Foundation
+import GhosttyVtRaw
+
 extension Terminal {
     /// Values used to answer terminal-originated capability and geometry queries.
     public struct QueryPolicy: Sendable, Equatable {
@@ -66,20 +69,54 @@ extension Terminal {
         public let colorScheme: ColorScheme?
         /// `nil` ignores device-attribute queries.
         public let deviceAttributes: DeviceAttributes?
+        /// Bytes returned for ENQ. `nil` sends no response.
+        public let enquiryResponse: Data?
+        /// Value returned for XTVERSION. `nil` keeps libghostty-vt's default response.
+        public let xtermVersion: String?
 
         public init(
             size: SizeResponse? = nil,
             colorScheme: ColorScheme? = nil,
-            deviceAttributes: DeviceAttributes? = nil
+            deviceAttributes: DeviceAttributes? = nil,
+            enquiryResponse: Data? = nil,
+            xtermVersion: String? = nil
         ) {
             self.size = size
             self.colorScheme = colorScheme
             self.deviceAttributes = deviceAttributes
+            self.enquiryResponse = enquiryResponse
+            self.xtermVersion = xtermVersion
         }
     }
 
     public enum FocusEvent: Sendable, Equatable {
         case gained
         case lost
+    }
+}
+
+final class TerminalQueryStringStorage {
+    private let pointer: UnsafeMutablePointer<UInt8>?
+    private let count: Int
+
+    init(bytes: [UInt8] = []) {
+        count = bytes.count
+        guard !bytes.isEmpty else {
+            pointer = nil
+            return
+        }
+
+        let storage = UnsafeMutablePointer<UInt8>.allocate(capacity: bytes.count)
+        storage.initialize(from: bytes, count: bytes.count)
+        pointer = storage
+    }
+
+    deinit {
+        pointer?.deinitialize(count: count)
+        pointer?.deallocate()
+    }
+
+    var string: GhosttyString {
+        .init(ptr: pointer.map { UnsafePointer($0) }, len: count)
     }
 }

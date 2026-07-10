@@ -48,6 +48,8 @@ public final class Terminal: @unchecked Sendable {
     var pressedMouseButtons: UInt16 = 0
     var pendingEvents: [Event] = []
     var queryPolicy = QueryPolicy()
+    var enquiryResponseStorage = TerminalQueryStringStorage()
+    var xtermVersionStorage = TerminalQueryStringStorage()
     var currentSizeReport = QueryPolicy.Size(columns: 0, rows: 0, cellWidth: 0, cellHeight: 0)
 
     public init(configuration: Configuration = .init()) throws {
@@ -207,6 +209,7 @@ public enum TerminalError: Error, Sendable, Equatable {
     case invalidViewportRow
     case invalidQuerySize
     case invalidDeviceAttributes
+    case invalidXtermVersion
     case invalidRenderTransaction
     case unexpectedResult
 }

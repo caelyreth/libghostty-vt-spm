@@ -46,9 +46,29 @@ extension Terminal {
         if let attributes = policy.deviceAttributes, attributes.primary.featureCodes.count > 64 {
             throw TerminalError.invalidDeviceAttributes
         }
+        if let version = policy.xtermVersion, version.utf8.count > 256 {
+            throw TerminalError.invalidXtermVersion
+        }
+        let enquiryStorage = TerminalQueryStringStorage(
+            bytes: policy.enquiryResponse.map { Array($0) } ?? []
+        )
+        let versionStorage = TerminalQueryStringStorage(
+            bytes: policy.xtermVersion.map { Array($0.utf8) } ?? []
+        )
 
         withTerminalLock {
             queryPolicy = policy
+            enquiryResponseStorage = enquiryStorage
+            xtermVersionStorage = versionStorage
+        }
+    }
+
+    /// Returns whether the terminal has requested focus transitions from its host.
+    public func isFocusReportingEnabled() throws -> Bool {
+        try withTerminalLock {
+            var enabled = false
+            try Self.check(ghostty_terminal_mode_get(handle, Self.focusReportingMode, &enabled))
+            return enabled
         }
     }
 
@@ -60,6 +80,8 @@ extension Terminal {
             return GHOSTTY_FOCUS_LOST
         }
     }
+
+    private static let focusReportingMode = ghostty_mode_new(1004, false)
 
     static func colorScheme(from scheme: QueryPolicy.ColorScheme) -> GhosttyColorScheme {
         switch scheme {
