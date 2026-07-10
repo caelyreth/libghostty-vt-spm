@@ -96,6 +96,22 @@ final class TerminalTests: XCTestCase {
         XCTAssertEqual(output, Data("\u{1B}[<0;2;1M".utf8))
     }
 
+    func testDrainEventsReturnsCopiedTerminalEffects() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        terminal.feed("\u{07}\u{1B}]2;RainBook\u{07}\u{1B}]7;file:///tmp\u{07}\u{1B}[5n")
+
+        XCTAssertEqual(
+            terminal.drainEvents(),
+            [
+                .bell,
+                .titleChanged("RainBook"),
+                .workingDirectoryChanged("file:///tmp"),
+                .writeToPty(Data("\u{1B}[0n".utf8)),
+            ]
+        )
+        XCTAssertTrue(terminal.drainEvents().isEmpty)
+    }
+
     func testTerminalIsSendableAndSynchronizesConcurrentAccess() throws {
         assertSendable(Terminal.self)
 

@@ -45,6 +45,7 @@ public final class Terminal: @unchecked Sendable {
     var graphemeBuffer: [UInt8] = []
     var inputBuffer = [UInt8](repeating: 0, count: 128)
     var pressedMouseButtons: UInt16 = 0
+    var pendingEvents: [Event] = []
 
     public init(configuration: Configuration = .init()) throws {
         guard configuration.columns > 0, configuration.rows > 0 else {
@@ -100,6 +101,7 @@ public final class Terminal: @unchecked Sendable {
             keyEvent = rawKeyEvent
             mouseEncoder = rawMouseEncoder
             mouseEvent = rawMouseEvent
+            try configureEffects()
         } catch {
             ghostty_mouse_event_free(rawMouseEvent)
             ghostty_mouse_encoder_free(rawMouseEncoder)
