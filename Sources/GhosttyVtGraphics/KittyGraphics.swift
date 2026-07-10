@@ -46,7 +46,7 @@ public enum KittyGraphics {
         }
 
         let callback = unsafeBitCast(pngDecoderCallback, to: UnsafeRawPointer.self)
-        try Terminal.checkGraphicsResult(ghostty_sys_set(GHOSTTY_SYS_OPT_DECODE_PNG, callback))
+        try checkKittyGraphicsResult(ghostty_sys_set(GHOSTTY_SYS_OPT_DECODE_PNG, callback))
         decoderBox.decoder = decoder
     }
 
@@ -96,24 +96,24 @@ extension Terminal {
             var allowsSharedMemory = configuration.allowsSharedMemoryMedium
             var storageLimit = configuration.storageLimitBytes
 
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_MEDIUM_FILE, &allowsFile)
             )
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_terminal_set(
                     handle,
                     GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_MEDIUM_TEMP_FILE,
                     &allowsTemporaryFile
                 )
             )
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_terminal_set(
                     handle,
                     GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_MEDIUM_SHARED_MEM,
                     &allowsSharedMemory
                 )
             )
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_STORAGE_LIMIT, &storageLimit)
             )
             return try kittyGraphicsConfigurationLocked(handle) != nil
@@ -145,24 +145,24 @@ extension Terminal {
             if graphicsResult == GHOSTTY_NO_VALUE {
                 return nil
             }
-            try Self.checkGraphicsResult(graphicsResult)
+            try checkKittyGraphicsResult(graphicsResult)
             guard let graphics else {
                 throw TerminalError.unexpectedResult
             }
 
             var generation: UInt64 = 0
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_kitty_graphics_get(graphics, GHOSTTY_KITTY_GRAPHICS_DATA_GENERATION, &generation)
             )
 
             var rawIterator: OpaquePointer?
-            try Self.checkGraphicsResult(ghostty_kitty_graphics_placement_iterator_new(nil, &rawIterator))
+            try checkKittyGraphicsResult(ghostty_kitty_graphics_placement_iterator_new(nil, &rawIterator))
             defer { ghostty_kitty_graphics_placement_iterator_free(rawIterator) }
             guard let iterator = rawIterator else {
                 throw TerminalError.unexpectedResult
             }
 
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_kitty_graphics_get(
                     graphics,
                     GHOSTTY_KITTY_GRAPHICS_DATA_PLACEMENT_ITERATOR,
@@ -170,7 +170,7 @@ extension Terminal {
                 )
             )
             var layer = rawLayer(options.layer)
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_kitty_graphics_placement_iterator_set(
                     iterator,
                     GHOSTTY_KITTY_GRAPHICS_PLACEMENT_ITERATOR_OPTION_LAYER,
@@ -195,7 +195,7 @@ extension Terminal {
                     GHOSTTY_KITTY_GRAPHICS_PLACEMENT_DATA_Y_OFFSET,
                     GHOSTTY_KITTY_GRAPHICS_PLACEMENT_DATA_Z,
                 ]
-                try Self.checkGraphicsResult(
+                try checkKittyGraphicsResult(
                     placementKeys.withUnsafeBufferPointer { keys in
                         KittyGraphicsOutputPointers.withPointers(
                             &imageIdentifier,
@@ -228,7 +228,7 @@ extension Terminal {
 
                 var renderInfo = GhosttyKittyGraphicsPlacementRenderInfo()
                 renderInfo.size = MemoryLayout<GhosttyKittyGraphicsPlacementRenderInfo>.size
-                try Self.checkGraphicsResult(
+                try checkKittyGraphicsResult(
                     ghostty_kitty_graphics_placement_render_info(iterator, image, handle, &renderInfo)
                 )
                 placements.append(
@@ -264,22 +264,22 @@ extension Terminal {
         if storageResult == GHOSTTY_NO_VALUE {
             return nil
         }
-        try Self.checkGraphicsResult(storageResult)
+        try checkKittyGraphicsResult(storageResult)
 
         var allowsFile = false
         var allowsTemporaryFile = false
         var allowsSharedMemory = false
-        try Self.checkGraphicsResult(
+        try checkKittyGraphicsResult(
             ghostty_terminal_get(handle, GHOSTTY_TERMINAL_DATA_KITTY_IMAGE_MEDIUM_FILE, &allowsFile)
         )
-        try Self.checkGraphicsResult(
+        try checkKittyGraphicsResult(
             ghostty_terminal_get(
                 handle,
                 GHOSTTY_TERMINAL_DATA_KITTY_IMAGE_MEDIUM_TEMP_FILE,
                 &allowsTemporaryFile
             )
         )
-        try Self.checkGraphicsResult(
+        try checkKittyGraphicsResult(
             ghostty_terminal_get(
                 handle,
                 GHOSTTY_TERMINAL_DATA_KITTY_IMAGE_MEDIUM_SHARED_MEM,
@@ -312,7 +312,7 @@ extension Terminal {
             GHOSTTY_KITTY_IMAGE_DATA_FORMAT,
             GHOSTTY_KITTY_IMAGE_DATA_GENERATION,
         ]
-        try Self.checkGraphicsResult(
+        try checkKittyGraphicsResult(
             imageKeys.withUnsafeBufferPointer { keys in
                 KittyGraphicsOutputPointers.withPointers(
                     &identifier,
@@ -337,10 +337,10 @@ extension Terminal {
         if includePixels {
             var pointer: UnsafePointer<UInt8>?
             var count = 0
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_kitty_graphics_image_get(image, GHOSTTY_KITTY_IMAGE_DATA_DATA_PTR, &pointer)
             )
-            try Self.checkGraphicsResult(
+            try checkKittyGraphicsResult(
                 ghostty_kitty_graphics_image_get(image, GHOSTTY_KITTY_IMAGE_DATA_DATA_LEN, &count)
             )
             guard count >= 0, let pointer else {
@@ -528,6 +528,23 @@ private func rawLayer(_ layer: KittyGraphicsLayer) -> GhosttyKittyPlacementLayer
         return GHOSTTY_KITTY_PLACEMENT_LAYER_BELOW_TEXT
     case .aboveText:
         return GHOSTTY_KITTY_PLACEMENT_LAYER_ABOVE_TEXT
+    }
+}
+
+private func checkKittyGraphicsResult(_ result: GhosttyResult) throws {
+    switch result {
+    case GHOSTTY_SUCCESS:
+        return
+    case GHOSTTY_OUT_OF_MEMORY:
+        throw TerminalError.outOfMemory
+    case GHOSTTY_INVALID_VALUE:
+        throw TerminalError.invalidValue
+    case GHOSTTY_OUT_OF_SPACE:
+        throw TerminalError.outOfSpace
+    case GHOSTTY_NO_VALUE:
+        throw TerminalError.noValue
+    default:
+        throw TerminalError.unexpectedResult
     }
 }
 

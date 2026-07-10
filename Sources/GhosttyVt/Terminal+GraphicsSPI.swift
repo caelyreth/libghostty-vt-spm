@@ -1,5 +1,4 @@
 import Foundation
-import GhosttyVtRaw
 
 extension Terminal {
     /// Serializes a graphics extension's short-lived inspection of the terminal.
@@ -13,10 +12,5 @@ extension Terminal {
         try withTerminalLock {
             try body(handle)
         }
-    }
-
-    @_spi(GhosttyVtGraphics)
-    public static func checkGraphicsResult(_ result: GhosttyResult) throws {
-        try check(result)
     }
 }
