@@ -76,8 +76,8 @@ final class TerminalTests: XCTestCase {
         XCTAssertEqual(try terminal.encode(.init(text: "a")), Data("a".utf8))
         XCTAssertEqual(try terminal.encode(.init(key: .enter)), Data([0x0D]))
         XCTAssertTrue(Terminal.isPasteSafe("safe"))
-        XCTAssertFalse(Terminal.isPasteSafe("first\\nsecond"))
-        XCTAssertEqual(try terminal.encodePaste("first\\nsecond"), Data("first\\rsecond".utf8))
+        XCTAssertFalse(Terminal.isPasteSafe("first\nsecond"))
+        XCTAssertEqual(try terminal.encodePaste("first\nsecond"), Data("first\rsecond".utf8))
     }
 
     func testMouseEncodingUsesTerminalReportingMode() throws {
