@@ -1,6 +1,10 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+// Bump this before manually publishing a new package release.
+let releaseVersion = "__RELEASE_VERSION__"
+let binaryArtifactVersion = "__BINARY_ARTIFACT_VERSION__"
+
 let package = Package(
     name: "GhosttyVtSPM",
     platforms: [
@@ -30,7 +34,7 @@ let package = Package(
         ),
         .binaryTarget(
             name: "GhosttyVtPrebuilt",
-            url: "__DOWNLOAD_URL__",
+            url: "__DOWNLOAD_URL_PREFIX__/\(binaryArtifactVersion)/GhosttyVtPrebuilt.xcframework.zip",
             checksum: "__CHECKSUM__"
         ),
     ]

@@ -1,31 +1,22 @@
 name: Build libghostty-vt
 
 on:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
-      ghostty_ref:
-        description: "Ghostty branch, tag, or commit. Empty means main."
-        required: false
-        type: string
-        default: ""
-      release_tag:
-        description: "Package release version, for example 1.2.0. Empty means next patch."
-        required: false
-        type: string
-        default: ""
-      skip_release:
-        description: "Build and test without publishing releases."
+      release:
+        description: "Publish the version declared in Package.swift."
         required: false
         type: boolean
         default: false
-  schedule:
-    - cron: "23 6 * * 1"
 
 permissions:
   contents: write
 
 concurrency:
-  group: build-${{ github.ref_name || 'scheduled' }}
+  group: build-${{ github.ref_name }}${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release == 'true' && '-release' || '' }}
   cancel-in-progress: true
 
 defaults:
@@ -36,9 +27,7 @@ jobs:
   prepare:
     runs-on: macos-15
     outputs:
-      build_needed: ${{ steps.prepare.outputs.build_needed }}
       build_ref: ${{ steps.prepare.outputs.build_ref }}
-      resolved_sha: ${{ steps.prepare.outputs.resolved_sha }}
       release_tag: ${{ steps.prepare.outputs.release_tag }}
       do_release: ${{ steps.prepare.outputs.do_release }}
     steps:
@@ -48,17 +37,13 @@ jobs:
 
       - name: Prepare Build
         id: prepare
-        run: ./Scripts/ci/prepare.sh "$EVENT_NAME" "$GHOSTTY_REF" "$RELEASE_TAG" "$SKIP_RELEASE"
+        run: ./Scripts/ci/prepare.sh "$RELEASE"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT_NAME: ${{ github.event_name }}
-          GHOSTTY_REF: ${{ github.event.inputs.ghostty_ref }}
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
-          SKIP_RELEASE: ${{ github.event.inputs.skip_release || 'false' }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release || 'false' }}
 
   build:
     needs: prepare
-    if: needs.prepare.outputs.build_needed == 'true'
     name: Build ${{ matrix.artifact }}
     runs-on: macos-15
     timeout-minutes: 60
@@ -114,7 +99,6 @@ jobs:
   package:
     name: Prepare XCFramework
     needs: [prepare, build]
-    if: needs.prepare.outputs.build_needed == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -155,6 +139,7 @@ jobs:
         run: |
           ./Scripts/update-package.sh \
             "$PWD/build/GhosttyVtPrebuilt.xcframework.zip" \
+            "${{ needs.prepare.outputs.release_tag }}" \
             "https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare.outputs.release_tag }}/GhosttyVtPrebuilt.xcframework.zip"
 
       - name: Commit Package Manifest
@@ -171,6 +156,7 @@ jobs:
         uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ needs.prepare.outputs.release_tag }}
+          target_commitish: ${{ github.event.repository.default_branch }}
           body: |
             ### GhosttyVt ${{ needs.prepare.outputs.release_tag }}
 
@@ -179,7 +165,6 @@ jobs:
             ### Upstream
 
             - Ref: [`${{ needs.prepare.outputs.build_ref }}`](https://github.com/ghostty-org/ghostty/tree/${{ needs.prepare.outputs.build_ref }})
-            - Commit: [`${{ needs.prepare.outputs.resolved_sha }}`](https://github.com/ghostty-org/ghostty/commit/${{ needs.prepare.outputs.resolved_sha }})
 
             ### Assets
 

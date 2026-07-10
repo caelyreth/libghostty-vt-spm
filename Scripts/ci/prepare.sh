@@ -2,78 +2,64 @@
 
 set -eu
 
-EVENT=${1:-}
-INPUT_REF=${2:-}
-INPUT_RELEASE_TAG=${3:-}
-SKIP_RELEASE=${4:-false}
+RELEASE=${1:-false}
 OUTPUT_FILE=${GITHUB_OUTPUT:-/dev/stdout}
-DEFAULT_GHOSTTY_REF=${DEFAULT_GHOSTTY_REF:-main}
-
-next_release_tag() {
-    latest=$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort='version:refname' | tail -n 1)
-    if [ -z "$latest" ]; then
-        echo "0.0.1"
-        return
-    fi
-
-    IFS=. read -r major minor patch <<EOF
-$latest
-EOF
-    echo "$major.$minor.$((patch + 1))"
-}
+CONFIG_FILE=GhosttyVt.config
+MANIFEST_FILE=Package.swift
 
 write_outputs() {
     {
-        echo "build_needed=$1"
-        echo "build_ref=$2"
-        echo "resolved_sha=$3"
-        echo "release_tag=$4"
-        echo "do_release=$5"
+        echo "build_ref=$1"
+        echo "release_tag=$2"
+        echo "do_release=$3"
     } >> "$OUTPUT_FILE"
 }
 
-if [ "$EVENT" = "schedule" ]; then
-    SKIP_RELEASE=false
-elif [ "$EVENT" != "workflow_dispatch" ]; then
-    SKIP_RELEASE=true
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[!] missing Ghostty build configuration: $CONFIG_FILE"
+    exit 1
 fi
 
-if [ -n "$INPUT_REF" ]; then
-    BUILD_REF=$INPUT_REF
-else
-    BUILD_REF=$DEFAULT_GHOSTTY_REF
+BUILD_REF=$(sed -nE 's/^[[:space:]]*ghostty_ref[[:space:]]*=[[:space:]]*"([0-9a-f]{40})"[[:space:]]*(#.*)?$/\1/p' "$CONFIG_FILE")
+MATCH_COUNT=$(printf '%s\n' "$BUILD_REF" | grep -c . || true)
+if [ "$MATCH_COUNT" -ne 1 ]; then
+    echo "[!] $CONFIG_FILE must define exactly one lowercase 40-character ghostty_ref"
+    exit 1
 fi
 
-if [ -z "$BUILD_REF" ]; then
-    write_outputs false "" "" "" false
-    exit 0
+if [ ! -f "$MANIFEST_FILE" ]; then
+    echo "[!] missing package manifest: $MANIFEST_FILE"
+    exit 1
 fi
 
-RESOLVED_SHA=$(gh api "repos/ghostty-org/ghostty/commits/$BUILD_REF" --jq '.sha')
+RELEASE_TAG=$(sed -nE 's/^[[:space:]]*let releaseVersion = "([0-9]+\.[0-9]+\.[0-9]+)"[[:space:]]*$/\1/p' "$MANIFEST_FILE")
+MATCH_COUNT=$(printf '%s\n' "$RELEASE_TAG" | grep -c . || true)
+if [ "$MATCH_COUNT" -ne 1 ]; then
+    echo "[!] $MANIFEST_FILE must define exactly one semantic releaseVersion"
+    exit 1
+fi
 
-if [ -n "$INPUT_RELEASE_TAG" ]; then
-    if ! echo "$INPUT_RELEASE_TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-        echo "[!] release_tag must be a semantic version like 1.2.0: $INPUT_RELEASE_TAG"
+case "$RELEASE" in
+    true)
+        if [ "${GITHUB_REF_NAME:-main}" != "${DEFAULT_BRANCH:-main}" ]; then
+            echo "[!] releases must run from ${DEFAULT_BRANCH:-main}"
+            exit 1
+        fi
+
+        DO_RELEASE=true
+        git fetch --tags origin
+        if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            echo "[!] release $RELEASE_TAG already exists; bump releaseVersion in $MANIFEST_FILE"
+            exit 1
+        fi
+        ;;
+    false)
+        DO_RELEASE=false
+        ;;
+    *)
+        echo "[!] release must be true or false: $RELEASE"
         exit 1
-    fi
-    RELEASE_TAG=$INPUT_RELEASE_TAG
-else
-    RELEASE_TAG=$(next_release_tag)
-fi
+        ;;
+esac
 
-if [ "$SKIP_RELEASE" = "true" ]; then
-    DO_RELEASE=false
-else
-    DO_RELEASE=true
-fi
-
-BUILD_NEEDED=true
-if [ "$DO_RELEASE" = "true" ]; then
-    git fetch --tags origin
-    if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
-        echo "[*] release $RELEASE_TAG already exists, skipping"
-        BUILD_NEEDED=false
-    fi
-fi
-
-write_outputs "$BUILD_NEEDED" "$BUILD_REF" "$RESOLVED_SHA" "$RELEASE_TAG" "$DO_RELEASE"
+write_outputs "$BUILD_REF" "$RELEASE_TAG" "$DO_RELEASE"
