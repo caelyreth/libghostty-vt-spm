@@ -112,6 +112,45 @@ final class TerminalTests: XCTestCase {
         XCTAssertTrue(terminal.drainEvents().isEmpty)
     }
 
+    func testControlsExposeTerminalStatusAndTheme() throws {
+        let terminal = try Terminal(configuration: .init(columns: 4, rows: 2, maxScrollback: 4))
+        let palette = [TerminalFrame.RGBColor](repeating: .init(red: 4, green: 5, blue: 6), count: 256)
+        try terminal.setDefaultTheme(
+            .init(
+                foreground: .init(red: 1, green: 2, blue: 3),
+                background: .init(red: 7, green: 8, blue: 9),
+                cursor: .init(red: 10, green: 11, blue: 12),
+                palette: palette
+            )
+        )
+        terminal.feed("one\\r\\ntwo\\r\\nthree")
+        try terminal.scroll(to: .top)
+
+        let status = try terminal.status()
+        let frame = try terminal.update()
+
+        XCTAssertEqual(status.activeScreen, .primary)
+        XCTAssertGreaterThan(status.scrollbackRows, 0)
+        XCTAssertFalse(status.isViewportActive)
+        XCTAssertEqual(frame.theme.foreground, .init(red: 1, green: 2, blue: 3))
+        XCTAssertEqual(frame.theme.background, .init(red: 7, green: 8, blue: 9))
+        XCTAssertEqual(frame.theme.cursor, .init(red: 10, green: 11, blue: 12))
+        XCTAssertEqual(frame.theme.palette.first, .init(red: 4, green: 5, blue: 6))
+    }
+
+    func testControlsRejectInvalidValues() throws {
+        let terminal = try Terminal(configuration: .init(columns: 4, rows: 2, maxScrollback: 0))
+
+        XCTAssertThrowsError(try terminal.scroll(to: .row(-1))) { error in
+            XCTAssertEqual(error as? TerminalError, .invalidViewportRow)
+        }
+        XCTAssertThrowsError(
+            try terminal.setDefaultTheme(.init(palette: [.init(red: 1, green: 2, blue: 3)]))
+        ) { error in
+            XCTAssertEqual(error as? TerminalError, .invalidPalette)
+        }
+    }
+
     func testTerminalIsSendableAndSynchronizesConcurrentAccess() throws {
         assertSendable(Terminal.self)
 

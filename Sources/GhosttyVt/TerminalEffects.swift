@@ -69,7 +69,7 @@ extension Terminal {
         UnsafeMutableRawPointer?
     ) -> Void = { handle, userdata in
         guard let terminal = terminal(from: userdata) else { return }
-        guard let title = terminal.string(from: handle, data: GHOSTTY_TERMINAL_DATA_TITLE) else { return }
+        guard let title = terminal.terminalString(from: handle, data: GHOSTTY_TERMINAL_DATA_TITLE) else { return }
         terminal.pendingEvents.append(.titleChanged(title))
     }
 
@@ -78,7 +78,7 @@ extension Terminal {
         UnsafeMutableRawPointer?
     ) -> Void = { handle, userdata in
         guard let terminal = terminal(from: userdata) else { return }
-        let directory = terminal.string(from: handle, data: GHOSTTY_TERMINAL_DATA_PWD)
+        let directory = terminal.terminalString(from: handle, data: GHOSTTY_TERMINAL_DATA_PWD)
         terminal.pendingEvents.append(.workingDirectoryChanged(directory?.isEmpty == true ? nil : directory))
     }
 
@@ -95,7 +95,7 @@ extension Terminal {
         userdata.map { Unmanaged<Terminal>.fromOpaque($0).takeUnretainedValue() }
     }
 
-    private func string(
+    func terminalString(
         from terminal: OpaquePointer?,
         data: GhosttyTerminalData
     ) -> String? {

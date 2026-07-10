@@ -188,5 +188,7 @@ public enum TerminalError: Error, Sendable, Equatable {
     case invalidKey
     case invalidMouseButton
     case invalidMouseGeometry
+    case invalidPalette
+    case invalidViewportRow
     case unexpectedResult
 }
