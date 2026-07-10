@@ -1,9 +1,6 @@
-name: Build libghostty-vt
+name: Build and Release libghostty-vt
 
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       release:

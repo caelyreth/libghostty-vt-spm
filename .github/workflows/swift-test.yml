@@ -1,0 +1,53 @@
+name: Test Swift Package
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-test-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  test:
+    name: Test macOS arm64
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - uses: mlugg/setup-zig@v2.2.1
+        with:
+          version: 0.15.2
+
+      - name: Read Build Configuration
+        id: prepare
+        run: ./Scripts/ci/prepare.sh false
+
+      - name: Checkout Ghostty
+        run: |
+          git clone https://github.com/ghostty-org/ghostty references/ghostty-upstream
+          git -C references/ghostty-upstream checkout "${{ steps.prepare.outputs.build_ref }}"
+
+      - name: Build macOS arm64
+        run: |
+          ./Scripts/build-target.sh \
+            "$PWD/references/ghostty-upstream" \
+            aarch64-macos \
+            "$PWD/build/variants/macos"
+
+      - name: Test Swift Package
+        run: |
+          ./Scripts/create-xcframework.sh \
+            "$PWD/build/variants" \
+            "$PWD/binary/GhosttyVtPrebuilt.xcframework"
+          cp Scripts/templates/Package.local.swift Package.swift
+          swift test
