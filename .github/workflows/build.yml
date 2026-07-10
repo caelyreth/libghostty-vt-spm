@@ -1,4 +1,4 @@
-name: Build and Release libghostty-vt
+name: Build and release
 
 on:
   workflow_dispatch:
@@ -22,6 +22,7 @@ defaults:
 
 jobs:
   prepare:
+    name: Prepare
     runs-on: macos-15
     outputs:
       build_ref: ${{ steps.prepare.outputs.build_ref }}
@@ -148,25 +149,43 @@ jobs:
           git commit -m "chore: publish libghostty-vt ${{ needs.prepare.outputs.release_tag }}" || echo "No changes to commit"
           git push
 
-      - name: Publish Release
+      - name: Tag release
         if: needs.prepare.outputs.do_release == 'true'
-        uses: softprops/action-gh-release@v3.0.1
-        with:
-          tag_name: ${{ needs.prepare.outputs.release_tag }}
-          target_commitish: ${{ github.event.repository.default_branch }}
-          body: |
-            ### GhosttyVt ${{ needs.prepare.outputs.release_tag }}
+        run: |
+          git tag "$RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
 
-            SwiftPM binary package for `libghostty-vt`.
+      - name: Stage distributions
+        if: needs.prepare.outputs.do_release == 'true'
+        run: |
+          mkdir -p dist
+          cp build/GhosttyVtPrebuilt.xcframework.zip dist/
+          cp build/tarballs/ghostty-vt-*.tar.gz dist/
 
-            ### Upstream
+      - name: Create release notes
+        if: needs.prepare.outputs.do_release == 'true'
+        run: npx --yes changelogithub@14 --to "$RELEASE_TAG" --contributors --emoji false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
 
-            - Ref: [`${{ needs.prepare.outputs.build_ref }}`](https://github.com/ghostty-org/ghostty/tree/${{ needs.prepare.outputs.build_ref }})
+      - name: Append Ghostty revision
+        if: needs.prepare.outputs.do_release == 'true'
+        run: |
+          notes="$RUNNER_TEMP/release-notes.md"
+          gh release view "$RELEASE_TAG" --json body --jq .body > "$notes"
+          printf '\n\nBuilt from Ghostty commit [`%s`](https://github.com/ghostty-org/ghostty/commit/%s).\n' "$GHOSTTY_SHA" "$GHOSTTY_SHA" >> "$notes"
+          gh release edit "$RELEASE_TAG" --notes-file "$notes"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          GHOSTTY_SHA: ${{ needs.prepare.outputs.build_ref }}
 
-            ### Assets
-
-            - `GhosttyVtPrebuilt.xcframework.zip`: SwiftPM binary target artifact.
-            - `ghostty-vt-*.tar.gz`: per-SDK static library archives.
-          files: |
-            build/GhosttyVtPrebuilt.xcframework.zip
-            build/tarballs/ghostty-vt-*.tar.gz
+      - name: Attach distributions
+        if: needs.prepare.outputs.do_release == 'true'
+        run: gh release upload "$RELEASE_TAG" dist/* --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
