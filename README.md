@@ -42,19 +42,6 @@ import GhosttyVtRaw
 
 Minimal supported: macOS 14, iOS 17, and macCatalyst 17.
 
-### Maintenance
-
-`GhosttyVt.config` is the single tracked pin for the Ghostty source revision
-used by CI. It accepts only a full commit ID, so changing the upstream requires
-an explicit, reproducible source change.
-
-CI builds and tests pull requests, `main`, and manual dispatches. A manual
-dispatch with **release** enabled publishes the semantic `releaseVersion` in
-`Package.swift`; it never derives a version from the triggering event or
-increments one automatically. Before releasing, bump `releaseVersion` while
-leaving `binaryArtifactVersion` at the previous published artifact. CI updates
-the latter and its checksum when it produces the new XCFramework.
-
 ### Acknowledgements
 
 - [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) for `libghostty-vt`
