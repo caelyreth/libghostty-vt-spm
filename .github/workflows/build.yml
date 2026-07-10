@@ -139,7 +139,8 @@ jobs:
       - name: Test Products
         run: |
           cp Scripts/templates/Package.local.swift Package.swift
-          swift build --product GhosttyVt
+          swift build --product GhosttyVtRaw
+          swift test
 
       - uses: actions/upload-artifact@v7.0.1
         if: needs.prepare.outputs.do_release != 'true'

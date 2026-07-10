@@ -10,12 +10,23 @@ let package = Package(
     ],
     products: [
         .library(name: "GhosttyVt", targets: ["GhosttyVt"]),
+        .library(name: "GhosttyVtRaw", targets: ["GhosttyVtRaw"]),
     ],
     targets: [
         .target(
             name: "GhosttyVt",
-            dependencies: ["GhosttyVtPrebuilt"],
+            dependencies: ["GhosttyVtRaw"],
             path: "Sources/GhosttyVt"
+        ),
+        .target(
+            name: "GhosttyVtRaw",
+            dependencies: ["GhosttyVtPrebuilt"],
+            path: "Sources/GhosttyVtRaw"
+        ),
+        .testTarget(
+            name: "GhosttyVtTests",
+            dependencies: ["GhosttyVt"],
+            path: "Tests/GhosttyVtTests"
         ),
         .binaryTarget(
             name: "GhosttyVtPrebuilt",
