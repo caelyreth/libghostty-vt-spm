@@ -34,6 +34,29 @@ final class TerminalTests: XCTestCase {
         XCTAssertTrue(clean.rows.isEmpty)
     }
 
+    func testRenderTransactionBorrowsDirtyCellsWithoutBuildingAFrame() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        _ = try terminal.update()
+        terminal.feed("A\u{754C}")
+
+        var rendered: [(UInt16, String)] = []
+        try terminal.withRenderTransaction { transaction in
+            XCTAssertEqual(transaction.dirtyState, .partial)
+            try transaction.forEachRow { row in
+                try row.forEachCell { cell in
+                    let text = try cell.withUTF8 { String(decoding: $0, as: UTF8.self) }
+                    if !text.isEmpty {
+                        rendered.append((cell.column, text))
+                    }
+                }
+            }
+        }
+
+        XCTAssertEqual(rendered.map { $0.1 }, ["A", "\u{754C}"])
+        XCTAssertEqual(rendered.map { $0.0 }, [0, 1])
+        XCTAssertEqual(try terminal.update().dirtyState, .clean)
+    }
+
     func testUpdateResolvesTrueColorBackgrounds() throws {
         let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
         _ = try terminal.update()

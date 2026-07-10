@@ -215,7 +215,7 @@ extension Terminal {
         }
     }
 
-    private static func style(from raw: GhosttyStyle) -> TerminalFrame.Style {
+    static func style(from raw: GhosttyStyle) -> TerminalFrame.Style {
         .init(
             foreground: styleColor(from: raw.fg_color),
             background: styleColor(from: raw.bg_color),
@@ -244,7 +244,7 @@ extension Terminal {
         }
     }
 
-    private static func cellWidth(from raw: GhosttyCellWide) -> TerminalFrame.CellWidth {
+    static func cellWidth(from raw: GhosttyCellWide) -> TerminalFrame.CellWidth {
         switch raw {
         case GHOSTTY_CELL_WIDE_WIDE:
             return .wide
@@ -257,7 +257,7 @@ extension Terminal {
         }
     }
 
-    private static func semanticContent(
+    static func semanticContent(
         from raw: GhosttyCellSemanticContent
     ) -> TerminalFrame.SemanticContent {
         switch raw {

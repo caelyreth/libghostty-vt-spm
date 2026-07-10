@@ -52,7 +52,7 @@ extension Terminal {
         )
     }
 
-    private func frameMetadata() throws -> (size: Size, dirtyState: TerminalFrame.DirtyState) {
+    func frameMetadata() throws -> (size: Size, dirtyState: TerminalFrame.DirtyState) {
         var columns: UInt16 = 0
         var rows: UInt16 = 0
         var rawDirtyState: GhosttyRenderStateDirty = GHOSTTY_RENDER_STATE_DIRTY_FALSE
@@ -87,7 +87,7 @@ extension Terminal {
         return (.init(columns: columns, rows: rows), dirtyState)
     }
 
-    private func frameTheme(refresh: Bool) throws -> TerminalFrame.Theme {
+    func frameTheme(refresh: Bool) throws -> TerminalFrame.Theme {
         if !refresh, let cachedTheme {
             return cachedTheme
         }
@@ -110,7 +110,7 @@ extension Terminal {
         return theme
     }
 
-    private func frameCursor() throws -> TerminalFrame.Cursor {
+    func frameCursor() throws -> TerminalFrame.Cursor {
         var visible = false
         var blinking = false
         var passwordInput = false
@@ -249,7 +249,7 @@ extension Terminal {
         return rows
     }
 
-    private func rowMetadata(_ rawRow: UInt64) throws -> (
+    func rowMetadata(_ rawRow: UInt64) throws -> (
         isSoftWrapped: Bool,
         isContinuation: Bool,
         semanticPrompt: TerminalFrame.SemanticPrompt
@@ -268,7 +268,7 @@ extension Terminal {
         )
     }
 
-    private func rowSelection(_ iterator: OpaquePointer) throws -> TerminalFrame.Selection? {
+    func rowSelection(_ iterator: OpaquePointer) throws -> TerminalFrame.Selection? {
         var rawSelection = GhosttyRenderStateRowSelection()
         rawSelection.size = MemoryLayout<GhosttyRenderStateRowSelection>.size
         let result = ghostty_render_state_row_get(
@@ -284,7 +284,7 @@ extension Terminal {
         return .init(startColumn: rawSelection.start_x, endColumn: rawSelection.end_x)
     }
 
-    private func clearGlobalDirtyState() throws {
+    func clearGlobalDirtyState() throws {
         var clean: GhosttyRenderStateDirty = GHOSTTY_RENDER_STATE_DIRTY_FALSE
         try Self.check(
             ghostty_render_state_set(renderState, GHOSTTY_RENDER_STATE_OPTION_DIRTY, &clean)

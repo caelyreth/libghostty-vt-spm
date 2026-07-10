@@ -43,6 +43,7 @@ public final class Terminal: @unchecked Sendable {
     let mouseEvent: OpaquePointer
     var cachedTheme: TerminalFrame.Theme?
     var graphemeBuffer: [UInt8] = []
+    var graphemeCodepointBuffer: [UInt32] = []
     var inputBuffer = [UInt8](repeating: 0, count: 128)
     var pressedMouseButtons: UInt16 = 0
     var pendingEvents: [Event] = []
@@ -206,5 +207,6 @@ public enum TerminalError: Error, Sendable, Equatable {
     case invalidViewportRow
     case invalidQuerySize
     case invalidDeviceAttributes
+    case invalidRenderTransaction
     case unexpectedResult
 }
