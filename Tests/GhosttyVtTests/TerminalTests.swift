@@ -183,6 +183,7 @@ final class TerminalTests: XCTestCase {
             to: .init(column: 4, row: 0)
         )
         XCTAssertEqual(try terminal.copySelection(), "alpha")
+        XCTAssertEqual(try terminal.exportSelection(), Data("alpha".utf8))
 
         try terminal.selectWord(at: .init(column: 7, row: 0))
         XCTAssertEqual(try terminal.copySelection(), "beta")
@@ -197,6 +198,16 @@ final class TerminalTests: XCTestCase {
         XCTAssertThrowsError(try terminal.copySelection()) { error in
             XCTAssertEqual(error as? TerminalError, .noValue)
         }
+        XCTAssertThrowsError(try terminal.exportSelection()) { error in
+            XCTAssertEqual(error as? TerminalError, .noValue)
+        }
+    }
+
+    func testScreenExportProducesCopiedPlainText() throws {
+        let terminal = try Terminal(configuration: .init(columns: 12, rows: 2, maxScrollback: 0))
+        terminal.feed("first\r\nsecond")
+
+        XCTAssertEqual(try terminal.exportScreen(), Data("first\nsecond".utf8))
     }
 
     func testHyperlinkInspectionCopiesTheViewportURI() throws {
