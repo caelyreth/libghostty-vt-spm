@@ -211,5 +211,7 @@ public enum TerminalError: Error, Sendable, Equatable {
     case invalidDeviceAttributes
     case invalidXtermVersion
     case invalidRenderTransaction
+    case invalidSelectionGestureConfiguration
+    case invalidSelectionGestureGeometry
     case unexpectedResult
 }

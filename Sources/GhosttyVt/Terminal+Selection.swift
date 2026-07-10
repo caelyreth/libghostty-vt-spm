@@ -170,7 +170,7 @@ extension Terminal {
         return reference
     }
 
-    private func installSelection(_ selection: inout GhosttySelection) throws {
+    func installSelection(_ selection: inout GhosttySelection) throws {
         try Self.check(ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_SELECTION, &selection))
     }
 }
