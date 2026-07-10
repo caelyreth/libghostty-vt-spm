@@ -124,7 +124,42 @@ extension Terminal {
         }
     }
 
-    private func gridReference(at point: ViewportPoint) throws -> GhosttyGridRef {
+    /// Returns the hyperlink URI at a viewport cell, if the cell has one.
+    public func hyperlink(at point: ViewportPoint) throws -> String? {
+        try withTerminalLock {
+            var reference = try gridReference(at: point)
+            var required = 0
+            let query = ghostty_grid_ref_hyperlink_uri(&reference, nil, 0, &required)
+            if query == GHOSTTY_SUCCESS {
+                guard required == 0 else {
+                    throw TerminalError.unexpectedResult
+                }
+                return nil
+            }
+            guard query == GHOSTTY_OUT_OF_SPACE else {
+                try Self.check(query)
+                throw TerminalError.unexpectedResult
+            }
+
+            var output = [UInt8](repeating: 0, count: required)
+            var written = 0
+            let result = output.withUnsafeMutableBufferPointer { buffer in
+                ghostty_grid_ref_hyperlink_uri(
+                    &reference,
+                    buffer.baseAddress,
+                    buffer.count,
+                    &written
+                )
+            }
+            try Self.check(result)
+            guard written <= output.count else {
+                throw TerminalError.unexpectedResult
+            }
+            return String(decoding: output.prefix(written), as: UTF8.self)
+        }
+    }
+
+    func gridReference(at point: ViewportPoint) throws -> GhosttyGridRef {
         var rawPoint = GhosttyPoint()
         rawPoint.tag = GHOSTTY_POINT_TAG_VIEWPORT
         rawPoint.value.coordinate = .init(x: point.column, y: point.row)

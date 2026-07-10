@@ -199,6 +199,14 @@ final class TerminalTests: XCTestCase {
         }
     }
 
+    func testHyperlinkInspectionCopiesTheViewportURI() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        terminal.feed("\u{1B}]8;;https://example.com\u{07}link\u{1B}]8;;\u{07}")
+
+        XCTAssertEqual(try terminal.hyperlink(at: .init(column: 0, row: 0)), "https://example.com")
+        XCTAssertNil(try terminal.hyperlink(at: .init(column: 5, row: 0)))
+    }
+
     func testTerminalIsSendableAndSynchronizesConcurrentAccess() throws {
         assertSendable(Terminal.self)
 
