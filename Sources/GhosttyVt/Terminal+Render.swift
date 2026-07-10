@@ -1,6 +1,26 @@
 import GhosttyVtRaw
 
 extension Terminal {
+    private static let frameDataKeys: [GhosttyRenderStateData] = [
+        GHOSTTY_RENDER_STATE_DATA_COLS,
+        GHOSTTY_RENDER_STATE_DATA_ROWS,
+        GHOSTTY_RENDER_STATE_DATA_DIRTY,
+    ]
+
+    private static let cursorDataKeys: [GhosttyRenderStateData] = [
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_VISIBLE,
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_BLINKING,
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_PASSWORD_INPUT,
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_HAS_VALUE,
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_VISUAL_STYLE,
+    ]
+
+    private static let cursorPositionDataKeys: [GhosttyRenderStateData] = [
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_X,
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_Y,
+        GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_WIDE_TAIL,
+    ]
+
     /// Captures a Swift-owned incremental render update.
     ///
     /// This uses libghostty-vt's two-phase render update. Terminal access is
@@ -16,43 +36,55 @@ extension Terminal {
         try Self.check(beginResult)
         try Self.check(ghostty_render_state_end_update(renderState))
 
-        let size = try frameSize()
-        let dirtyState = try frameDirtyState()
-        let theme = try frameTheme(refresh: dirtyState == .full || cachedTheme == nil)
+        let metadata = try frameMetadata()
+        let theme = try frameTheme(refresh: metadata.dirtyState == .full || cachedTheme == nil)
         let cursor = try frameCursor()
-        let rows = try changedRows(for: dirtyState, size: size)
+        let rows = try changedRows(for: metadata.dirtyState, size: metadata.size)
 
         try clearGlobalDirtyState()
 
         return .init(
-            size: size,
-            dirtyState: dirtyState,
+            size: metadata.size,
+            dirtyState: metadata.dirtyState,
             theme: theme,
             cursor: cursor,
             rows: rows
         )
     }
 
-    private func frameSize() throws -> Size {
+    private func frameMetadata() throws -> (size: Size, dirtyState: TerminalFrame.DirtyState) {
         var columns: UInt16 = 0
         var rows: UInt16 = 0
-        try Self.check(ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_COLS, &columns))
-        try Self.check(ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_ROWS, &rows))
-        return .init(columns: columns, rows: rows)
-    }
+        var rawDirtyState: GhosttyRenderStateDirty = GHOSTTY_RENDER_STATE_DIRTY_FALSE
+        var written = 0
 
-    private func frameDirtyState() throws -> TerminalFrame.DirtyState {
-        var rawState: GhosttyRenderStateDirty = GHOSTTY_RENDER_STATE_DIRTY_FALSE
-        try Self.check(ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_DIRTY, &rawState))
-
-        switch rawState {
-        case GHOSTTY_RENDER_STATE_DIRTY_PARTIAL:
-            return .partial
-        case GHOSTTY_RENDER_STATE_DIRTY_FULL:
-            return .full
-        default:
-            return .clean
+        let result = COutputPointers.withPointers(&columns, &rows, &rawDirtyState) { values in
+            Self.frameDataKeys.withUnsafeBufferPointer { keyBuffer in
+                ghostty_render_state_get_multi(
+                    renderState,
+                    keyBuffer.count,
+                    keyBuffer.baseAddress,
+                    values.baseAddress,
+                    &written
+                )
+            }
         }
+        try Self.check(result)
+        guard written == Self.frameDataKeys.count else {
+            throw TerminalError.unexpectedResult
+        }
+
+        let dirtyState: TerminalFrame.DirtyState
+        switch rawDirtyState {
+        case GHOSTTY_RENDER_STATE_DIRTY_PARTIAL:
+            dirtyState = .partial
+        case GHOSTTY_RENDER_STATE_DIRTY_FULL:
+            dirtyState = .full
+        default:
+            dirtyState = .clean
+        }
+
+        return (.init(columns: columns, rows: rows), dirtyState)
     }
 
     private func frameTheme(refresh: Bool) throws -> TerminalFrame.Theme {
@@ -60,41 +92,19 @@ extension Terminal {
             return cachedTheme
         }
 
-        var background = GhosttyColorRgb()
-        var foreground = GhosttyColorRgb()
-        var hasCursor = false
-        var cursor = GhosttyColorRgb()
-        var palette = [GhosttyColorRgb](repeating: GhosttyColorRgb(), count: 256)
+        var colors = GhosttyRenderStateColors()
+        colors.size = MemoryLayout<GhosttyRenderStateColors>.size
+        try Self.check(ghostty_render_state_colors_get(renderState, &colors))
 
-        try Self.check(
-            ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_COLOR_BACKGROUND, &background)
-        )
-        try Self.check(
-            ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_COLOR_FOREGROUND, &foreground)
-        )
-        try Self.check(
-            ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_COLOR_CURSOR_HAS_VALUE, &hasCursor)
-        )
-        if hasCursor {
-            try Self.check(
-                ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_COLOR_CURSOR, &cursor)
-            )
+        let palette = withUnsafeBytes(of: &colors.palette) { bytes in
+            bytes.bindMemory(to: GhosttyColorRgb.self).map(Self.color(from:))
         }
-
-        let paletteResult = palette.withUnsafeMutableBufferPointer { buffer in
-            ghostty_render_state_get(
-                renderState,
-                GHOSTTY_RENDER_STATE_DATA_COLOR_PALETTE,
-                UnsafeMutableRawPointer(buffer.baseAddress!)
-            )
-        }
-        try Self.check(paletteResult)
 
         let theme = TerminalFrame.Theme(
-            foreground: Self.color(from: foreground),
-            background: Self.color(from: background),
-            cursor: hasCursor ? Self.color(from: cursor) : nil,
-            palette: palette.map(Self.color(from:))
+            foreground: Self.color(from: colors.foreground),
+            background: Self.color(from: colors.background),
+            cursor: colors.cursor_has_value ? Self.color(from: colors.cursor) : nil,
+            palette: palette
         )
         cachedTheme = theme
         return theme
@@ -107,25 +117,28 @@ extension Terminal {
         var hasPosition = false
         var style: GhosttyRenderStateCursorVisualStyle = GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BLOCK
 
-        try Self.check(ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VISIBLE, &visible))
-        try Self.check(ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_BLINKING, &blinking))
-        try Self.check(
-            ghostty_render_state_get(
-                renderState,
-                GHOSTTY_RENDER_STATE_DATA_CURSOR_PASSWORD_INPUT,
-                &passwordInput
-            )
-        )
-        try Self.check(
-            ghostty_render_state_get(
-                renderState,
-                GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_HAS_VALUE,
-                &hasPosition
-            )
-        )
-        try Self.check(
-            ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VISUAL_STYLE, &style)
-        )
+        var written = 0
+        let result = COutputPointers.withPointers(
+            &visible,
+            &blinking,
+            &passwordInput,
+            &hasPosition,
+            &style
+        ) { values in
+            Self.cursorDataKeys.withUnsafeBufferPointer { keyBuffer in
+                ghostty_render_state_get_multi(
+                    renderState,
+                    keyBuffer.count,
+                    keyBuffer.baseAddress,
+                    values.baseAddress,
+                    &written
+                )
+            }
+        }
+        try Self.check(result)
+        guard written == Self.cursorDataKeys.count else {
+            throw TerminalError.unexpectedResult
+        }
 
         guard hasPosition else {
             return .init(
@@ -141,19 +154,22 @@ extension Terminal {
         var column: UInt16 = 0
         var row: UInt16 = 0
         var isWideTail = false
-        try Self.check(
-            ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_X, &column)
-        )
-        try Self.check(
-            ghostty_render_state_get(renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_Y, &row)
-        )
-        try Self.check(
-            ghostty_render_state_get(
-                renderState,
-                GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_WIDE_TAIL,
-                &isWideTail
-            )
-        )
+        written = 0
+        let positionResult = COutputPointers.withPointers(&column, &row, &isWideTail) { values in
+            Self.cursorPositionDataKeys.withUnsafeBufferPointer { keyBuffer in
+                ghostty_render_state_get_multi(
+                    renderState,
+                    keyBuffer.count,
+                    keyBuffer.baseAddress,
+                    values.baseAddress,
+                    &written
+                )
+            }
+        }
+        try Self.check(positionResult)
+        guard written == Self.cursorPositionDataKeys.count else {
+            throw TerminalError.unexpectedResult
+        }
 
         return .init(
             isVisible: visible,
