@@ -46,6 +46,8 @@ public final class Terminal: @unchecked Sendable {
     var inputBuffer = [UInt8](repeating: 0, count: 128)
     var pressedMouseButtons: UInt16 = 0
     var pendingEvents: [Event] = []
+    var queryPolicy = QueryPolicy()
+    var currentSizeReport = QueryPolicy.Size(columns: 0, rows: 0, cellWidth: 0, cellHeight: 0)
 
     public init(configuration: Configuration = .init()) throws {
         guard configuration.columns > 0, configuration.rows > 0 else {
@@ -101,6 +103,12 @@ public final class Terminal: @unchecked Sendable {
             keyEvent = rawKeyEvent
             mouseEncoder = rawMouseEncoder
             mouseEvent = rawMouseEvent
+            currentSizeReport = .init(
+                columns: configuration.columns,
+                rows: configuration.rows,
+                cellWidth: 0,
+                cellHeight: 0
+            )
             try configureEffects()
         } catch {
             ghostty_mouse_event_free(rawMouseEvent)
@@ -161,6 +169,12 @@ public final class Terminal: @unchecked Sendable {
             try Self.check(
                 ghostty_terminal_resize(handle, size.columns, size.rows, cellWidth, cellHeight)
             )
+            currentSizeReport = .init(
+                columns: size.columns,
+                rows: size.rows,
+                cellWidth: cellWidth,
+                cellHeight: cellHeight
+            )
         }
     }
 
@@ -190,5 +204,7 @@ public enum TerminalError: Error, Sendable, Equatable {
     case invalidMouseGeometry
     case invalidPalette
     case invalidViewportRow
+    case invalidQuerySize
+    case invalidDeviceAttributes
     case unexpectedResult
 }

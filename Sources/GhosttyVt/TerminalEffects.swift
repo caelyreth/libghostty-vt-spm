@@ -45,6 +45,21 @@ extension Terminal {
             option: GHOSTTY_TERMINAL_OPT_PWD_CHANGED,
             callback: Self.pwdChangedCallback
         )
+        try Self.setEffect(
+            on: handle,
+            option: GHOSTTY_TERMINAL_OPT_SIZE,
+            callback: Self.sizeCallback
+        )
+        try Self.setEffect(
+            on: handle,
+            option: GHOSTTY_TERMINAL_OPT_COLOR_SCHEME,
+            callback: Self.colorSchemeCallback
+        )
+        try Self.setEffect(
+            on: handle,
+            option: GHOSTTY_TERMINAL_OPT_DEVICE_ATTRIBUTES,
+            callback: Self.deviceAttributesCallback
+        )
     }
 
     private static let writePtyCallback: @convention(c) (
@@ -80,6 +95,54 @@ extension Terminal {
         guard let terminal = terminal(from: userdata) else { return }
         let directory = terminal.terminalString(from: handle, data: GHOSTTY_TERMINAL_DATA_PWD)
         terminal.pendingEvents.append(.workingDirectoryChanged(directory?.isEmpty == true ? nil : directory))
+    }
+
+    private static let sizeCallback: @convention(c) (
+        OpaquePointer?,
+        UnsafeMutableRawPointer?,
+        UnsafeMutablePointer<GhosttySizeReportSize>?
+    ) -> Bool = { _, userdata, output in
+        guard
+            let terminal = terminal(from: userdata),
+            let response = terminal.queryPolicy.size,
+            let output
+        else {
+            return false
+        }
+        output.pointee = terminal.sizeReport(for: response)
+        return true
+    }
+
+    private static let colorSchemeCallback: @convention(c) (
+        OpaquePointer?,
+        UnsafeMutableRawPointer?,
+        UnsafeMutablePointer<GhosttyColorScheme>?
+    ) -> Bool = { _, userdata, output in
+        guard
+            let terminal = terminal(from: userdata),
+            let scheme = terminal.queryPolicy.colorScheme,
+            let output
+        else {
+            return false
+        }
+        output.pointee = colorScheme(from: scheme)
+        return true
+    }
+
+    private static let deviceAttributesCallback: @convention(c) (
+        OpaquePointer?,
+        UnsafeMutableRawPointer?,
+        UnsafeMutablePointer<GhosttyDeviceAttributes>?
+    ) -> Bool = { _, userdata, output in
+        guard
+            let terminal = terminal(from: userdata),
+            let attributes = terminal.queryPolicy.deviceAttributes,
+            let output
+        else {
+            return false
+        }
+        output.pointee = deviceAttributes(from: attributes)
+        return true
     }
 
     private static func setEffect<Callback>(
