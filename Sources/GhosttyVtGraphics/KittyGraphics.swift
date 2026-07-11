@@ -231,6 +231,7 @@ extension Terminal {
                 try checkKittyGraphicsResult(
                     ghostty_kitty_graphics_placement_render_info(iterator, image, handle, &renderInfo)
                 )
+                let gridBounds = try kittyGraphicsPlacementBounds(iterator, image: image, terminal: handle)
                 placements.append(
                     .init(
                         imageIdentifier: imageIdentifier,
@@ -239,7 +240,8 @@ extension Terminal {
                         xOffset: xOffset,
                         yOffset: yOffset,
                         zIndex: zIndex,
-                        renderInfo: .init(raw: renderInfo)
+                        renderInfo: .init(raw: renderInfo),
+                        gridBounds: gridBounds
                     )
                 )
             }
@@ -360,6 +362,43 @@ extension Terminal {
             pixels: pixels
         )
     }
+
+    private func kittyGraphicsPlacementBounds(
+        _ iterator: OpaquePointer,
+        image: OpaquePointer,
+        terminal: OpaquePointer
+    ) throws -> GridRange? {
+        var selection = GhosttySelection()
+        selection.size = MemoryLayout<GhosttySelection>.size
+        let result = ghostty_kitty_graphics_placement_rect(iterator, image, terminal, &selection)
+        if result == GHOSTTY_NO_VALUE {
+            return nil
+        }
+        try checkKittyGraphicsResult(result)
+        guard let start = try kittyGraphicsGridPoint(from: &selection.start, terminal: terminal),
+              let end = try kittyGraphicsGridPoint(from: &selection.end, terminal: terminal) else {
+            throw TerminalError.unexpectedResult
+        }
+        return .init(start: start, end: end, isRectangular: selection.rectangle)
+    }
+
+    private func kittyGraphicsGridPoint(
+        from reference: inout GhosttyGridRef,
+        terminal: OpaquePointer
+    ) throws -> GridPoint? {
+        var coordinate = GhosttyPointCoordinate()
+        let result = ghostty_terminal_point_from_grid_ref(
+            terminal,
+            &reference,
+            GHOSTTY_POINT_TAG_SCREEN,
+            &coordinate
+        )
+        if result == GHOSTTY_NO_VALUE {
+            return nil
+        }
+        try checkKittyGraphicsResult(result)
+        return .init(column: coordinate.x, row: coordinate.y, coordinateSpace: .screen)
+    }
 }
 
 public struct KittyGraphicsConfiguration: Sendable, Equatable {
@@ -476,6 +515,32 @@ public struct KittyGraphicsPlacement: Sendable, Equatable {
         public let sourceWidth: UInt32
         public let sourceHeight: UInt32
 
+        public init(
+            pixelWidth: UInt32,
+            pixelHeight: UInt32,
+            gridColumns: UInt32,
+            gridRows: UInt32,
+            viewportColumn: Int32,
+            viewportRow: Int32,
+            isViewportVisible: Bool,
+            sourceX: UInt32,
+            sourceY: UInt32,
+            sourceWidth: UInt32,
+            sourceHeight: UInt32
+        ) {
+            self.pixelWidth = pixelWidth
+            self.pixelHeight = pixelHeight
+            self.gridColumns = gridColumns
+            self.gridRows = gridRows
+            self.viewportColumn = viewportColumn
+            self.viewportRow = viewportRow
+            self.isViewportVisible = isViewportVisible
+            self.sourceX = sourceX
+            self.sourceY = sourceY
+            self.sourceWidth = sourceWidth
+            self.sourceHeight = sourceHeight
+        }
+
         fileprivate init(raw: GhosttyKittyGraphicsPlacementRenderInfo) {
             pixelWidth = raw.pixel_width
             pixelHeight = raw.pixel_height
@@ -498,6 +563,8 @@ public struct KittyGraphicsPlacement: Sendable, Equatable {
     public let yOffset: UInt32
     public let zIndex: Int32
     public let renderInfo: RenderInfo
+    /// The placement's grid rectangle, or `nil` for virtual placements.
+    public let gridBounds: Terminal.GridRange?
 
     public init(
         imageIdentifier: UInt32,
@@ -506,7 +573,8 @@ public struct KittyGraphicsPlacement: Sendable, Equatable {
         xOffset: UInt32,
         yOffset: UInt32,
         zIndex: Int32,
-        renderInfo: RenderInfo
+        renderInfo: RenderInfo,
+        gridBounds: Terminal.GridRange?
     ) {
         self.imageIdentifier = imageIdentifier
         self.placementIdentifier = placementIdentifier
@@ -515,6 +583,7 @@ public struct KittyGraphicsPlacement: Sendable, Equatable {
         self.yOffset = yOffset
         self.zIndex = zIndex
         self.renderInfo = renderInfo
+        self.gridBounds = gridBounds
     }
 }
 
