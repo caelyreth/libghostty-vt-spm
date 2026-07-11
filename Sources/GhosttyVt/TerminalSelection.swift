@@ -32,6 +32,39 @@ extension Terminal {
         }
     }
 
+    /// A copied cell inspection result for search, accessibility, and marks.
+    ///
+    /// Unlike `TerminalFrame.Cell`, this is intended for occasional arbitrary
+    /// grid access rather than a render loop, and does not resolve palette
+    /// colors against the current terminal theme.
+    public struct GridCell: Sendable, Equatable {
+        public let text: String
+        public let width: TerminalFrame.CellWidth
+        public let style: TerminalFrame.Style
+        public let hyperlink: String?
+        public let isBackgroundColorOnly: Bool
+        public let isProtected: Bool
+        public let semanticContent: TerminalFrame.SemanticContent
+
+        public init(
+            text: String,
+            width: TerminalFrame.CellWidth,
+            style: TerminalFrame.Style,
+            hyperlink: String?,
+            isBackgroundColorOnly: Bool,
+            isProtected: Bool,
+            semanticContent: TerminalFrame.SemanticContent
+        ) {
+            self.text = text
+            self.width = width
+            self.style = style
+            self.hyperlink = hyperlink
+            self.isBackgroundColorOnly = isBackgroundColorOnly
+            self.isProtected = isProtected
+            self.semanticContent = semanticContent
+        }
+    }
+
     public enum SelectionAdjustment: Sendable, Equatable {
         case left
         case right

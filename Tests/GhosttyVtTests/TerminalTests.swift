@@ -278,6 +278,16 @@ final class TerminalTests: XCTestCase {
             try anchor.point(in: .screen),
             .init(column: 3, row: 0, coordinateSpace: .screen)
         )
+        XCTAssertEqual(try anchor.cell()?.text, "h")
+    }
+
+    func testGridCellCopiesSearchAndAccessibilityMetadata() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        terminal.feed("\u{1B}]8;;https://example.com\u{07}x\u{1B}]8;;\u{07}")
+
+        let cell = try terminal.cell(at: .init(column: 0, row: 0, coordinateSpace: .viewport))
+        XCTAssertEqual(cell.text, "x")
+        XCTAssertEqual(cell.hyperlink, "https://example.com")
     }
 
     func testScreenExportProducesCopiedPlainText() throws {
