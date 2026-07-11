@@ -67,12 +67,26 @@ and formatting rules. `makeSelectionGesture()` supplies the C-backed
 press/drag/release state machine for a host pointer stream, including repeated
 clicks and autoscroll. `copySelection()` supplies clipboard-ready text;
 `exportSelection(options:)` and `exportScreen(options:)` return copied plain,
-terminal, or HTML data.
+terminal, or HTML data. `ExportOptions.terminalState` can additionally emit
+the terminal/screen state needed by VT session capture.
 
 Use `hyperlink(at:)` to inspect an OSC 8 link at a visible cell. Terminal
 query answers are host policy: configure `setQueryPolicy(_:)`, send focus
 transitions only when `isFocusReportingEnabled()` is true, and forward every
 resulting `writeToPty` event to the process.
+
+For search, marks, accessibility, and restored positions, use `GridPoint`,
+`makeGridAnchor(at:)`, and `cell(at:)`. Anchors track cells through scrolling
+and reflow; all points and cell values returned to Swift are copied. These are
+inspection APIs, not a replacement for the render transaction in a render loop.
+
+### Engine Controls
+
+`Terminal.libraryInfo()` reports the linked libghostty-vt capabilities and
+version. The facade also exposes ANSI/DEC mode reads and writes, cursor reset
+defaults, manual title/PWD overrides, Glyph Protocol enablement, and APC input
+limits. Set `APCBufferLimits` before accepting untrusted output to bound APC
+and Kitty graphics buffering.
 
 ### Kitty Graphics
 
@@ -92,7 +106,8 @@ textures using image generations; placement geometry can still change when the
 viewport scrolls. Graphics storage is bounded, and file, temporary-file, and
 shared-memory media all default to disabled. To accept PNG payloads, install a
 process-wide `KittyGraphics.PNGDecoder` before feeding graphics data. The host
-chooses decoding and owns all textures and rendering.
+chooses decoding and owns all textures and rendering. Each placement also has a
+copied screen-coordinate `gridBounds` when it is not virtual.
 
 ### Raw API
 
