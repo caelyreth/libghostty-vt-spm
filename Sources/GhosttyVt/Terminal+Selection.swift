@@ -31,6 +31,14 @@ extension Terminal {
 
     /// Selects the word at a viewport cell using libghostty-vt's word rules.
     public func selectWord(at point: ViewportPoint) throws {
+        try selectWord(
+            at: .init(column: point.column, row: point.row, coordinateSpace: .viewport)
+        )
+    }
+
+    /// Selects the word at a terminal point using the supplied boundary rules.
+    public func selectWord(at point: GridPoint, rules: WordSelectionRules = .init()) throws {
+        try Self.validateSelectionCodepoints(rules.boundaryCodepoints)
         try withTerminalLock {
             var options = GhosttyTerminalSelectWordOptions()
             options.size = MemoryLayout<GhosttyTerminalSelectWordOptions>.size
@@ -38,7 +46,50 @@ extension Terminal {
 
             var selection = GhosttySelection()
             selection.size = MemoryLayout<GhosttySelection>.size
-            try Self.check(ghostty_terminal_select_word(handle, &options, &selection))
+            let result: GhosttyResult
+            if let codepoints = rules.boundaryCodepoints {
+                result = codepoints.withUnsafeBufferPointer { buffer in
+                    options.boundary_codepoints = buffer.baseAddress
+                    options.boundary_codepoints_len = buffer.count
+                    return ghostty_terminal_select_word(handle, &options, &selection)
+                }
+            } else {
+                result = ghostty_terminal_select_word(handle, &options, &selection)
+            }
+            try Self.check(result)
+            try installSelection(&selection)
+        }
+    }
+
+    /// Selects the nearest word between two terminal points using Ghostty's drag semantics.
+    public func selectWordBetween(
+        from start: GridPoint,
+        to end: GridPoint,
+        rules: WordSelectionRules = .init()
+    ) throws {
+        guard start.coordinateSpace == end.coordinateSpace else {
+            throw TerminalError.invalidValue
+        }
+        try Self.validateSelectionCodepoints(rules.boundaryCodepoints)
+        try withTerminalLock {
+            var options = GhosttyTerminalSelectWordBetweenOptions()
+            options.size = MemoryLayout<GhosttyTerminalSelectWordBetweenOptions>.size
+            options.start = try gridReference(at: start)
+            options.end = try gridReference(at: end)
+
+            var selection = GhosttySelection()
+            selection.size = MemoryLayout<GhosttySelection>.size
+            let result: GhosttyResult
+            if let codepoints = rules.boundaryCodepoints {
+                result = codepoints.withUnsafeBufferPointer { buffer in
+                    options.boundary_codepoints = buffer.baseAddress
+                    options.boundary_codepoints_len = buffer.count
+                    return ghostty_terminal_select_word_between(handle, &options, &selection)
+                }
+            } else {
+                result = ghostty_terminal_select_word_between(handle, &options, &selection)
+            }
+            try Self.check(result)
             try installSelection(&selection)
         }
     }
@@ -48,15 +99,34 @@ extension Terminal {
         at point: ViewportPoint,
         semanticPromptBoundary: Bool = false
     ) throws {
+        try selectLine(
+            at: .init(column: point.column, row: point.row, coordinateSpace: .viewport),
+            rules: .init(semanticPromptBoundary: semanticPromptBoundary)
+        )
+    }
+
+    /// Selects a line at a terminal point using the supplied trimming rules.
+    public func selectLine(at point: GridPoint, rules: LineSelectionRules = .init()) throws {
+        try Self.validateSelectionCodepoints(rules.trimmingCodepoints)
         try withTerminalLock {
             var options = GhosttyTerminalSelectLineOptions()
             options.size = MemoryLayout<GhosttyTerminalSelectLineOptions>.size
             options.ref = try gridReference(at: point)
-            options.semantic_prompt_boundary = semanticPromptBoundary
+            options.semantic_prompt_boundary = rules.semanticPromptBoundary
 
             var selection = GhosttySelection()
             selection.size = MemoryLayout<GhosttySelection>.size
-            try Self.check(ghostty_terminal_select_line(handle, &options, &selection))
+            let result: GhosttyResult
+            if let codepoints = rules.trimmingCodepoints {
+                result = codepoints.withUnsafeBufferPointer { buffer in
+                    options.whitespace = buffer.baseAddress
+                    options.whitespace_len = buffer.count
+                    return ghostty_terminal_select_line(handle, &options, &selection)
+                }
+            } else {
+                result = ghostty_terminal_select_line(handle, &options, &selection)
+            }
+            try Self.check(result)
             try installSelection(&selection)
         }
     }
@@ -73,6 +143,13 @@ extension Terminal {
 
     /// Selects the semantic command output containing a viewport cell.
     public func selectCommandOutput(at point: ViewportPoint) throws {
+        try selectCommandOutput(
+            at: .init(column: point.column, row: point.row, coordinateSpace: .viewport)
+        )
+    }
+
+    /// Selects the semantic command output containing a terminal point.
+    public func selectCommandOutput(at point: GridPoint) throws {
         try withTerminalLock {
             let reference = try gridReference(at: point)
             var selection = GhosttySelection()
@@ -272,6 +349,14 @@ extension Terminal {
             return .mirroredReverse
         default:
             return .forward
+        }
+    }
+
+    private static func validateSelectionCodepoints(_ codepoints: [UInt32]?) throws {
+        guard codepoints?.allSatisfy({
+            $0 <= 0x10FFFF && !((0xD800 ... 0xDFFF).contains($0))
+        }) ?? true else {
+            throw TerminalError.invalidValue
         }
     }
 }

@@ -52,6 +52,29 @@ extension Terminal {
         case mirroredReverse
     }
 
+    public struct WordSelectionRules: Sendable, Equatable {
+        /// `nil` uses libghostty-vt's default word-boundary codepoints.
+        public let boundaryCodepoints: [UInt32]?
+
+        public init(boundaryCodepoints: [UInt32]? = nil) {
+            self.boundaryCodepoints = boundaryCodepoints
+        }
+    }
+
+    public struct LineSelectionRules: Sendable, Equatable {
+        /// `nil` uses libghostty-vt's default whitespace-trimming codepoints.
+        public let trimmingCodepoints: [UInt32]?
+        public let semanticPromptBoundary: Bool
+
+        public init(
+            trimmingCodepoints: [UInt32]? = nil,
+            semanticPromptBoundary: Bool = false
+        ) {
+            self.trimmingCodepoints = trimmingCodepoints
+            self.semanticPromptBoundary = semanticPromptBoundary
+        }
+    }
+
     /// A cell coordinate in the visible terminal viewport.
     public struct ViewportPoint: Sendable, Equatable {
         public let column: UInt16

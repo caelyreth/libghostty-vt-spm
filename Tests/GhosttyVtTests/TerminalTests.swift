@@ -220,6 +220,13 @@ final class TerminalTests: XCTestCase {
         try terminal.selectWord(at: .init(column: 7, row: 0))
         XCTAssertEqual(try terminal.copySelection(), "beta")
 
+        try terminal.selectWordBetween(
+            from: .init(column: 0, row: 0, coordinateSpace: .viewport),
+            to: .init(column: 7, row: 0, coordinateSpace: .viewport),
+            rules: .init(boundaryCodepoints: [32])
+        )
+        XCTAssertEqual(try terminal.copySelection(), "alpha")
+
         try terminal.selectLine(at: .init(column: 2, row: 1))
         XCTAssertEqual(try terminal.copySelection(), "second line")
 
