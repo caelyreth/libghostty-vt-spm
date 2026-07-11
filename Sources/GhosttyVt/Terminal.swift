@@ -206,6 +206,8 @@ public enum TerminalError: Error, Sendable, Equatable {
     case invalidMouseButton
     case invalidMouseGeometry
     case invalidPalette
+    case invalidAPCBufferLimit
+    case invalidMode
     case invalidViewportRow
     case invalidQuerySize
     case invalidDeviceAttributes

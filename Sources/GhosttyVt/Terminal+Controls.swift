@@ -60,6 +60,83 @@ extension Terminal {
         }
     }
 
+    /// Sets the cursor defaults restored by a DECSCUSR reset sequence.
+    public func setCursorDefaults(_ defaults: CursorDefaults) throws {
+        try withTerminalLock {
+            if let style = defaults.style {
+                var rawStyle = Self.rawCursorStyle(from: style)
+                try Self.check(
+                    ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_STYLE, &rawStyle)
+                )
+            } else {
+                try Self.check(
+                    ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_STYLE, nil)
+                )
+            }
+
+            if var isBlinking = defaults.isBlinking {
+                try Self.check(
+                    ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_BLINK, &isBlinking)
+                )
+            } else {
+                try Self.check(
+                    ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_BLINK, nil)
+                )
+            }
+        }
+    }
+
+    /// Bounds buffered APC input before protocol parsing allocates memory.
+    public func setAPCBufferLimits(_ limits: APCBufferLimits) throws {
+        guard limits.allProtocols.map({ $0 >= 0 }) ?? true,
+              limits.kittyGraphics.map({ $0 >= 0 }) ?? true else {
+            throw TerminalError.invalidAPCBufferLimit
+        }
+
+        try withTerminalLock {
+            try setAPCBufferLimit(limits.allProtocols, option: GHOSTTY_TERMINAL_OPT_APC_MAX_BYTES)
+            try setAPCBufferLimit(limits.kittyGraphics, option: GHOSTTY_TERMINAL_OPT_APC_MAX_BYTES_KITTY)
+        }
+    }
+
+    /// Enables or disables Ghostty's Glyph Protocol APC handling.
+    public func setGlyphProtocolEnabled(_ enabled: Bool) throws {
+        try withTerminalLock {
+            var enabled = enabled
+            try Self.check(ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_GLYPH_PROTOCOL, &enabled))
+        }
+    }
+
+    /// Overrides the terminal title. Pass `nil` to clear the override.
+    public func setTitle(_ title: String?) throws {
+        try withTerminalLock {
+            try setTerminalString(title, option: GHOSTTY_TERMINAL_OPT_TITLE)
+        }
+    }
+
+    /// Overrides the terminal working directory. Pass `nil` to clear the override.
+    public func setWorkingDirectory(_ directory: String?) throws {
+        try withTerminalLock {
+            try setTerminalString(directory, option: GHOSTTY_TERMINAL_OPT_PWD)
+        }
+    }
+
+    /// Returns whether a supported ANSI or DEC-private terminal mode is enabled.
+    public func isModeEnabled(_ mode: Mode) throws -> Bool {
+        try withTerminalLock {
+            var enabled = false
+            try Self.check(ghostty_terminal_mode_get(handle, Self.rawMode(from: mode), &enabled))
+            return enabled
+        }
+    }
+
+    /// Sets a supported ANSI or DEC-private terminal mode.
+    public func setMode(_ mode: Mode, enabled: Bool) throws {
+        try withTerminalLock {
+            try Self.check(ghostty_terminal_mode_set(handle, Self.rawMode(from: mode), enabled))
+        }
+    }
+
     /// Captures Swift-owned terminal state for UI and input policy.
     public func status() throws -> Status {
         try withTerminalLock {
@@ -130,7 +207,45 @@ extension Terminal {
         try Self.check(ghostty_terminal_set(handle, option, &rawColor))
     }
 
+    private func setAPCBufferLimit(_ limit: Int?, option: GhosttyTerminalOption) throws {
+        guard var limit else {
+            try Self.check(ghostty_terminal_set(handle, option, nil))
+            return
+        }
+        try Self.check(ghostty_terminal_set(handle, option, &limit))
+    }
+
+    private func setTerminalString(_ value: String?, option: GhosttyTerminalOption) throws {
+        guard var value else {
+            try Self.check(ghostty_terminal_set(handle, option, nil))
+            return
+        }
+        try value.withUTF8 { utf8 in
+            var rawValue = GhosttyString(ptr: utf8.baseAddress, len: utf8.count)
+            try Self.check(ghostty_terminal_set(handle, option, &rawValue))
+        }
+    }
+
     private static func rawColor(from color: TerminalFrame.RGBColor) -> GhosttyColorRgb {
         .init(r: color.red, g: color.green, b: color.blue)
+    }
+
+    private static func rawCursorStyle(
+        from style: TerminalFrame.CursorStyle
+    ) -> GhosttyTerminalCursorStyle {
+        switch style {
+        case .bar:
+            return GHOSTTY_TERMINAL_CURSOR_STYLE_BAR
+        case .underline:
+            return GHOSTTY_TERMINAL_CURSOR_STYLE_UNDERLINE
+        case .hollowBlock:
+            return GHOSTTY_TERMINAL_CURSOR_STYLE_BLOCK_HOLLOW
+        case .block:
+            return GHOSTTY_TERMINAL_CURSOR_STYLE_BLOCK
+        }
+    }
+
+    private static func rawMode(from mode: Mode) -> GhosttyMode {
+        ghostty_mode_new(mode.value, mode.isANSI)
     }
 }

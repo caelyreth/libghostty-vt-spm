@@ -1,6 +1,44 @@
 import GhosttyVtRaw
 
 extension Terminal {
+    public struct CursorDefaults: Sendable, Equatable {
+        /// `nil` restores libghostty-vt's default block cursor.
+        public let style: TerminalFrame.CursorStyle?
+        /// `nil` restores libghostty-vt's default non-blinking behavior.
+        public let isBlinking: Bool?
+
+        public init(style: TerminalFrame.CursorStyle? = nil, isBlinking: Bool? = nil) {
+            self.style = style
+            self.isBlinking = isBlinking
+        }
+    }
+
+    public struct APCBufferLimits: Sendable, Equatable {
+        /// `nil` restores the library default for all APC protocols.
+        public let allProtocols: Int?
+        /// `nil` restores the library default for Kitty graphics APC payloads.
+        public let kittyGraphics: Int?
+
+        public init(allProtocols: Int? = nil, kittyGraphics: Int? = nil) {
+            self.allProtocols = allProtocols
+            self.kittyGraphics = kittyGraphics
+        }
+    }
+
+    /// An ANSI or DEC-private terminal mode identifier.
+    public struct Mode: Sendable, Equatable, Hashable {
+        public let value: UInt16
+        public let isANSI: Bool
+
+        public init(value: UInt16, isANSI: Bool) throws {
+            guard value <= 0x7FFF else {
+                throw TerminalError.invalidMode
+            }
+            self.value = value
+            self.isANSI = isANSI
+        }
+    }
+
     public enum ViewportPosition: Sendable, Equatable {
         case top
         case bottom

@@ -172,6 +172,38 @@ final class TerminalTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? TerminalError, .invalidPalette)
         }
+        XCTAssertThrowsError(
+            try terminal.setAPCBufferLimits(.init(allProtocols: -1))
+        ) { error in
+            XCTAssertEqual(error as? TerminalError, .invalidAPCBufferLimit)
+        }
+        XCTAssertThrowsError(
+            try Terminal.Mode(value: 0x8000, isANSI: false)
+        ) { error in
+            XCTAssertEqual(error as? TerminalError, .invalidMode)
+        }
+    }
+
+    func testControlsExposeModesAndManualMetadata() throws {
+        let terminal = try Terminal(configuration: .init(columns: 4, rows: 2, maxScrollback: 0))
+        let wraparound = try Terminal.Mode(value: 7, isANSI: false)
+
+        try terminal.setMode(wraparound, enabled: false)
+        XCTAssertFalse(try terminal.isModeEnabled(wraparound))
+        try terminal.setMode(wraparound, enabled: true)
+        XCTAssertTrue(try terminal.isModeEnabled(wraparound))
+
+        try terminal.setTitle("RainBook")
+        try terminal.setWorkingDirectory("file:///tmp/rainbook")
+        let status = try terminal.status()
+        XCTAssertEqual(status.title, "RainBook")
+        XCTAssertEqual(status.workingDirectory, "file:///tmp/rainbook")
+    }
+
+    func testLibraryInfoReturnsCopiedBuildCapabilities() throws {
+        let info = try Terminal.libraryInfo()
+        XCTAssertFalse(info.version.isEmpty)
+        XCTAssertGreaterThanOrEqual(info.majorVersion, 0)
     }
 
     func testSelectionUsesViewportCellsAndFormatsClipboardText() throws {
