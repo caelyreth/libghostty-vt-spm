@@ -280,6 +280,22 @@ final class TerminalTests: XCTestCase {
         XCTAssertEqual(try terminal.exportScreen(), Data("first\nsecond".utf8))
     }
 
+    func testExportOptionsExposeTerminalState() {
+        let options = Terminal.ExportOptions(
+            format: .terminal,
+            terminalState: .init(
+                palette: true,
+                modes: true,
+                screen: .init(cursor: true, style: true, hyperlink: true)
+            )
+        )
+        XCTAssertTrue(options.terminalState.palette)
+        XCTAssertTrue(options.terminalState.modes)
+        XCTAssertTrue(options.terminalState.screen.cursor)
+        XCTAssertTrue(options.terminalState.screen.style)
+        XCTAssertTrue(options.terminalState.screen.hyperlink)
+    }
+
     func testHyperlinkInspectionCopiesTheViewportURI() throws {
         let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
         terminal.feed("\u{1B}]8;;https://example.com\u{07}link\u{1B}]8;;\u{07}")

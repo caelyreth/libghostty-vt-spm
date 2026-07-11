@@ -11,6 +11,18 @@ extension Terminal {
             rawOptions.trim = options.trimTrailingWhitespace
             rawOptions.extra.size = MemoryLayout<GhosttyFormatterTerminalExtra>.size
             rawOptions.extra.screen.size = MemoryLayout<GhosttyFormatterScreenExtra>.size
+            rawOptions.extra.palette = options.terminalState.palette
+            rawOptions.extra.modes = options.terminalState.modes
+            rawOptions.extra.scrolling_region = options.terminalState.scrollingRegion
+            rawOptions.extra.tabstops = options.terminalState.tabStops
+            rawOptions.extra.pwd = options.terminalState.workingDirectory
+            rawOptions.extra.keyboard = options.terminalState.keyboard
+            rawOptions.extra.screen.cursor = options.terminalState.screen.cursor
+            rawOptions.extra.screen.style = options.terminalState.screen.style
+            rawOptions.extra.screen.hyperlink = options.terminalState.screen.hyperlink
+            rawOptions.extra.screen.protection = options.terminalState.screen.protection
+            rawOptions.extra.screen.kitty_keyboard = options.terminalState.screen.kittyKeyboard
+            rawOptions.extra.screen.charsets = options.terminalState.screen.characterSets
 
             var rawFormatter: OpaquePointer?
             try Self.check(ghostty_formatter_terminal_new(nil, &rawFormatter, handle, rawOptions))
