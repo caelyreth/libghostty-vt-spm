@@ -235,6 +235,44 @@ final class TerminalTests: XCTestCase {
         }
     }
 
+    func testSelectionExposesGridRangesAndKeyboardAdjustment() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        terminal.feed("alpha")
+
+        try terminal.select(.init(
+            start: .init(column: 0, row: 0, coordinateSpace: .screen),
+            end: .init(column: 0, row: 0, coordinateSpace: .screen)
+        ))
+        XCTAssertEqual(try terminal.selectionOrder(), .forward)
+        XCTAssertTrue(try terminal.selectionContains(.init(column: 0, row: 0, coordinateSpace: .viewport)))
+
+        let adjusted = try terminal.adjustSelection(.right)
+        XCTAssertEqual(adjusted.start.coordinateSpace, .screen)
+        XCTAssertEqual(try terminal.copySelection(), "al")
+    }
+
+    func testGridAnchorReturnsCopiedCoordinatesAndCanMove() throws {
+        let terminal = try Terminal(configuration: .init(columns: 8, rows: 2, maxScrollback: 0))
+        terminal.feed("anchor")
+        let anchor = try terminal.makeGridAnchor(at: .init(
+            column: 1,
+            row: 0,
+            coordinateSpace: .viewport
+        ))
+
+        XCTAssertTrue(anchor.hasValue)
+        XCTAssertEqual(
+            try anchor.point(in: .viewport),
+            .init(column: 1, row: 0, coordinateSpace: .viewport)
+        )
+
+        try anchor.move(to: .init(column: 3, row: 0, coordinateSpace: .screen))
+        XCTAssertEqual(
+            try anchor.point(in: .screen),
+            .init(column: 3, row: 0, coordinateSpace: .screen)
+        )
+    }
+
     func testScreenExportProducesCopiedPlainText() throws {
         let terminal = try Terminal(configuration: .init(columns: 12, rows: 2, maxScrollback: 0))
         terminal.feed("first\r\nsecond")

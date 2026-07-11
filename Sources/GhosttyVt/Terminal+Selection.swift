@@ -1,20 +1,32 @@
 import GhosttyVtRaw
 
 extension Terminal {
+    /// Selects a range in any terminal coordinate space accepted by libghostty-vt.
+    public func select(_ range: GridRange) throws {
+        guard range.start.coordinateSpace == range.end.coordinateSpace else {
+            throw TerminalError.invalidValue
+        }
+        try withTerminalLock {
+            var selection = GhosttySelection()
+            selection.size = MemoryLayout<GhosttySelection>.size
+            selection.start = try gridReference(at: range.start)
+            selection.end = try gridReference(at: range.end)
+            selection.rectangle = range.isRectangular
+            try installSelection(&selection)
+        }
+    }
+
     /// Selects the inclusive viewport range between two cells.
     public func select(
         from start: ViewportPoint,
         to end: ViewportPoint,
         rectangular: Bool = false
     ) throws {
-        try withTerminalLock {
-            var selection = GhosttySelection()
-            selection.size = MemoryLayout<GhosttySelection>.size
-            selection.start = try gridReference(at: start)
-            selection.end = try gridReference(at: end)
-            selection.rectangle = rectangular
-            try installSelection(&selection)
-        }
+        try select(.init(
+            start: .init(column: start.column, row: start.row, coordinateSpace: .viewport),
+            end: .init(column: end.column, row: end.row, coordinateSpace: .viewport),
+            isRectangular: rectangular
+        ))
     }
 
     /// Selects the word at a viewport cell using libghostty-vt's word rules.
@@ -74,6 +86,51 @@ extension Terminal {
     public func clearSelection() throws {
         try withTerminalLock {
             try Self.check(ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_SELECTION, nil))
+        }
+    }
+
+    /// Returns the active selection as a copied range in screen coordinates.
+    public func selection() throws -> GridRange? {
+        try withTerminalLock {
+            guard var selection = try activeSelection() else { return nil }
+            return try gridRange(from: &selection, in: .screen)
+        }
+    }
+
+    /// Returns the active selection's endpoint direction.
+    public func selectionOrder() throws -> SelectionOrder? {
+        try withTerminalLock {
+            guard var selection = try activeSelection() else { return nil }
+            var rawOrder: GhosttySelectionOrder = GHOSTTY_SELECTION_ORDER_FORWARD
+            try Self.check(ghostty_terminal_selection_order(handle, &selection, &rawOrder))
+            return Self.selectionOrder(from: rawOrder)
+        }
+    }
+
+    /// Moves the active selection's logical end using terminal keyboard-selection semantics.
+    @discardableResult
+    public func adjustSelection(_ adjustment: SelectionAdjustment) throws -> GridRange {
+        try withTerminalLock {
+            guard var selection = try activeSelection() else {
+                throw TerminalError.noValue
+            }
+            try Self.check(
+                ghostty_terminal_selection_adjust(handle, &selection, Self.rawSelectionAdjustment(from: adjustment))
+            )
+            try installSelection(&selection)
+            return try gridRange(from: &selection, in: .screen)
+        }
+    }
+
+    /// Returns whether a terminal point lies within the active selection.
+    public func selectionContains(_ point: GridPoint) throws -> Bool {
+        try withTerminalLock {
+            guard var selection = try activeSelection() else { return false }
+            var contains = false
+            try Self.check(
+                ghostty_terminal_selection_contains(handle, &selection, Self.rawGridPoint(from: point), &contains)
+            )
+            return contains
         }
     }
 
@@ -160,17 +217,61 @@ extension Terminal {
     }
 
     func gridReference(at point: ViewportPoint) throws -> GhosttyGridRef {
-        var rawPoint = GhosttyPoint()
-        rawPoint.tag = GHOSTTY_POINT_TAG_VIEWPORT
-        rawPoint.value.coordinate = .init(x: point.column, y: point.row)
-
-        var reference = GhosttyGridRef()
-        reference.size = MemoryLayout<GhosttyGridRef>.size
-        try Self.check(ghostty_terminal_grid_ref(handle, rawPoint, &reference))
-        return reference
+        try gridReference(at: .init(column: point.column, row: point.row, coordinateSpace: .viewport))
     }
 
     func installSelection(_ selection: inout GhosttySelection) throws {
         try Self.check(ghostty_terminal_set(handle, GHOSTTY_TERMINAL_OPT_SELECTION, &selection))
+    }
+
+    private func activeSelection() throws -> GhosttySelection? {
+        var selection = GhosttySelection()
+        selection.size = MemoryLayout<GhosttySelection>.size
+        let result = ghostty_terminal_get(handle, GHOSTTY_TERMINAL_DATA_SELECTION, &selection)
+        if result == GHOSTTY_NO_VALUE {
+            return nil
+        }
+        try Self.check(result)
+        return selection
+    }
+
+    private static func rawSelectionAdjustment(
+        from adjustment: SelectionAdjustment
+    ) -> GhosttySelectionAdjust {
+        switch adjustment {
+        case .left:
+            return GHOSTTY_SELECTION_ADJUST_LEFT
+        case .right:
+            return GHOSTTY_SELECTION_ADJUST_RIGHT
+        case .up:
+            return GHOSTTY_SELECTION_ADJUST_UP
+        case .down:
+            return GHOSTTY_SELECTION_ADJUST_DOWN
+        case .home:
+            return GHOSTTY_SELECTION_ADJUST_HOME
+        case .end:
+            return GHOSTTY_SELECTION_ADJUST_END
+        case .pageUp:
+            return GHOSTTY_SELECTION_ADJUST_PAGE_UP
+        case .pageDown:
+            return GHOSTTY_SELECTION_ADJUST_PAGE_DOWN
+        case .beginningOfLine:
+            return GHOSTTY_SELECTION_ADJUST_BEGINNING_OF_LINE
+        case .endOfLine:
+            return GHOSTTY_SELECTION_ADJUST_END_OF_LINE
+        }
+    }
+
+    private static func selectionOrder(from rawOrder: GhosttySelectionOrder) -> SelectionOrder {
+        switch rawOrder {
+        case GHOSTTY_SELECTION_ORDER_REVERSE:
+            return .reverse
+        case GHOSTTY_SELECTION_ORDER_MIRRORED_FORWARD:
+            return .mirroredForward
+        case GHOSTTY_SELECTION_ORDER_MIRRORED_REVERSE:
+            return .mirroredReverse
+        default:
+            return .forward
+        }
     }
 }
