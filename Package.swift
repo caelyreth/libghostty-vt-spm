@@ -2,7 +2,7 @@
 import PackageDescription
 
 // Bump this before manually publishing a new package release.
-let releaseVersion = "0.2.1"
+let releaseVersion = "0.3.0"
 let binaryArtifactVersion = "0.2.1"
 
 let package = Package(
